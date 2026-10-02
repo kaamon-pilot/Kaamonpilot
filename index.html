@@ -46,7 +46,7 @@ let role=localStorage.getItem("kg_role")||"B",me=localStorage.getItem("kg_me")||
 const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const inr=n=>"₹"+Number(n).toLocaleString("en-IN");
-const tag=s=>'<span class="tag">'+({open:"OPEN",accepted:"ACCEPTED",started:"IN PROGRESS",done:"COMPLETED"})[s.status]+'</span>';
+const tag=s=>'<span class="tag">'+({open:"OPEN",accepted:"ACCEPTED",started:"IN PROGRESS",done:"COMPLETED",cancelled:"CANCELLED"})[s.status]+'</span>';
 const head=s=>`<b>${esc(s.venue)}</b>${tag(s)}<br>${esc(s.date)}, ${esc(s.time)} · ${s.hours} hrs · ${inr(s.rate)}/hr<br><span class="big">${inr(s.rate*s.hours)}</span>`;
 const upd=(id,d)=>updateDoc(doc(db,"shifts",id),d);
 

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kaamgar Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4efe4;--card:#fffdf7;--ink:#2b2420;--mut:#7a6d62;--brick:#b5452b;--turm:#e0a31b;--line:#d9cfbc;--ok:#3f7d4e}
+@media (prefers-color-scheme:dark){:root{--bg:#1d1916;--card:#27211d;--ink:#f1e9da;--mut:#a89a8a;--brick:#e0674a;--turm:#e8b43a;--line:#41382f;--ok:#6bb57c}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 "IBM Plex Mono",monospace}
+.w{max-width:560px;margin:0 auto;padding:16px}h1{font-size:18px;margin:0 0 12px}h1 span{color:var(--brick)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.st{background:var(--card);border:1px dashed var(--line);padding:8px;text-align:center}.st b{display:block;font-size:20px}.st small{color:var(--mut)}
+.f{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.f button{padding:6px 10px;border:1px solid var(--ink);background:transparent;color:var(--ink);font:inherit}
+.f button.on{background:var(--ink);color:var(--bg)}
+.card{background:var(--card);border:1px dashed var(--line);border-left:5px solid var(--turm);padding:10px;margin:8px 0}
+.card.done{border-left-color:var(--ok)}.card.cancelled{border-left-color:var(--mut);opacity:.7}
+.tag{font-size:11px;padding:1px 7px;border:1px solid var(--ink);margin-left:6px}
+.a{display:flex;gap:6px;margin-top:8px}.a button{flex:1;padding:8px;border:0;background:var(--ink);color:var(--bg);font:inherit}
+.a .r{background:var(--brick);color:#fff}
+.empty{color:var(--mut);text-align:center;padding:20px}
+</style></head><body><div class="w">
+<h1>Kaamgar<span>.</span> Admin</h1><div class="stats" id="st"></div><div class="f" id="f"></div><div id="l"><div class="empty">Loading...</div></div></div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,signInAnonymously} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,updateDoc,deleteDoc,doc,onSnapshot,query,orderBy} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const firebaseConfig={apiKey:"AIzaSyAhlOUnba7MfRQIFlif60qsUkkZHnQS6Rc",authDomain:"kaamon-pilot.firebaseapp.com",projectId:"kaamon-pilot",storageBucket:"kaamon-pilot.firebasestorage.app",messagingSenderId:"463694330185",appId:"1:463694330185:web:2a445f304195f4cd8f4298"};
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+let all=[],flt="all";const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const inr=n=>"\u20b9"+Number(n).toLocaleString("en-IN");
+const NAMES={open:"OPEN",accepted:"ACCEPTED",started:"IN PROGRESS",done:"COMPLETED",cancelled:"CANCELLED"};
+function draw(){
+ const c=k=>all.filter(s=>s.status==k).length,paid=all.filter(s=>s.status=="done").reduce((t,s)=>t+s.rate*s.hours,0);
+ $("st").innerHTML=[["Total",all.length],["Open",c("open")],["Active",c("accepted")+c("started")],["Done",c("done")],["Cancelled",c("cancelled")],["Worker pay",inr(paid)]].map(x=>`<div class="st"><b>${x[1]}</b><small>${x[0]}</small></div>`).join("");
+ $("f").innerHTML=["all","open","accepted","started","done","cancelled"].map(k=>`<button class="${flt==k?"on":""}" data-f="${k}">${k}</button>`).join("");
+ const L=all.filter(s=>flt=="all"||s.status==flt);
+ $("l").innerHTML=L.length?L.map(s=>`<div class="card ${s.status}"><b>${esc(s.venue)}</b><span class="tag">${NAMES[s.status]||s.status}</span><br>${esc(s.date)}, ${esc(s.time)} \u00b7 ${s.hours} hrs \u00b7 ${inr(s.rate)}/hr = <b>${inr(s.rate*s.hours)}</b>${s.worker?"<br>Waiter: "+esc(s.worker):""}${s.otp&&s.status=="accepted"?" \u00b7 OTP "+s.otp:""}
+ <div class="a">${s.status!="cancelled"&&s.status!="done"?`<button class="r" data-c="${s.id}">Cancel</button>`:""}${s.status!="open"&&s.status!="done"?`<button data-o="${s.id}">Reopen</button>`:""}<button data-d="${s.id}">Delete</button></div></div>`).join(""):'<div class="empty">Nothing here.</div>'}
+document.addEventListener("click",async e=>{const t=e.target;if(t.tagName!=="BUTTON")return;
+ try{
+ if(t.dataset.f){flt=t.dataset.f;draw()}
+ if(t.dataset.c&&confirm("Cancel this shift?"))await updateDoc(doc(db,"shifts",t.dataset.c),{status:"cancelled"});
+ if(t.dataset.o&&confirm("Reopen as an open shift? Waiter will be removed."))await updateDoc(doc(db,"shifts",t.dataset.o),{status:"open",worker:"",otp:""});
+ if(t.dataset.d&&confirm("Delete permanently?"))await deleteDoc(doc(db,"shifts",t.dataset.d));
+ }catch(err){alert("Failed: "+err.message)}});
+signInAnonymously(auth).then(()=>onSnapshot(query(collection(db,"shifts"),orderBy("created","desc")),sn=>{all=sn.docs.map(d=>({id:d.id,...d.data()}));draw()},err=>{$("l").innerHTML='<div class="empty">'+esc(err.message)+'</div>'})).catch(err=>{$("l").innerHTML='<div class="empty">Sign-in failed: '+esc(err.message)+'</div>'});
+</script></body></html>
