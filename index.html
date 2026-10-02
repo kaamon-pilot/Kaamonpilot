@@ -85,6 +85,7 @@ $("tW").onclick=()=>{role="W";localStorage.setItem("kg_role",role);draw()};
 
 $("app").addEventListener("click",async e=>{
  const t=e.target;
+ if(t.tagName!=="BUTTON")return; // taps on input boxes must not redraw
  try{
  if(t.id=="post"){const v=$("v").value.trim(),d=$("d").value.trim(),tm=$("t").value.trim(),hr=+$("h").value,rt=+$("r").value;
   if(!v||!d||!tm||!(hr>0)||!(rt>0))return alert("Please fill all fields.");
