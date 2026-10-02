@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kaamgar Pilot</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4efe4;--card:#fffdf7;--ink:#2b2420;--mut:#7a6d62;--brick:#b5452b;--turm:#e0a31b;--line:#d9cfbc;--ok:#3f7d4e}
+@media (prefers-color-scheme:dark){:root{--bg:#1d1916;--card:#27211d;--ink:#f1e9da;--mut:#a89a8a;--brick:#e0674a;--turm:#e8b43a;--line:#41382f;--ok:#6bb57c}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Mono",monospace}
+.w{max-width:480px;margin:0 auto;padding:16px}h1{font-size:18px;margin:0}h1 span{color:var(--brick)}
+.sub{color:var(--mut);font-size:12px;margin-bottom:12px}
+.tabs{display:flex;gap:8px;margin:12px 0}
+.tabs button{flex:1;padding:10px;border:2px solid var(--ink);background:transparent;color:var(--ink);font:inherit;font-weight:600}
+.tabs button.on{background:var(--brick);border-color:var(--brick);color:#fff}
+.card{background:var(--card);border:1px dashed var(--line);border-left:5px solid var(--turm);padding:12px;margin:10px 0}
+.card.done{border-left-color:var(--ok)}
+label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
+input{width:100%;padding:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+.row{display:flex;gap:8px}.row>*{flex:1}
+.btn{padding:10px;border:0;background:var(--brick);color:#fff;font:inherit;font-weight:600;margin-top:10px;width:100%}
+.btn.alt{background:var(--ink);color:var(--bg)}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border:1px solid var(--ink);margin-left:6px}
+.otp{font-size:26px;letter-spacing:6px;font-weight:600;color:var(--brick)}.big{font-size:20px;font-weight:600}
+.empty{color:var(--mut);text-align:center;padding:24px 0}
+</style>
+</head>
+<body>
+<div class="w">
+<h1>Kaamgar<span>.</span> Pilot</h1>
+<div class="sub">Waiter shifts · Koramangala, Bengaluru</div>
+<div class="tabs"><button id="tB">Business</button><button id="tW">Waiter</button></div>
+<div id="app"><div class="empty">Loading…</div></div>
+</div>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getAuth,signInAnonymously} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getFirestore,collection,addDoc,updateDoc,doc,onSnapshot,query,orderBy,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// 1) PASTE YOUR FIREBASE WEB CONFIG HERE (Project settings > Your apps > Web)
+const firebaseConfig={apiKey:"AIzaSyAhlOUnba7MfRQIFlif60qsUkkZHnQS6Rc",authDomain:"kaamon-pilot.firebaseapp.com",projectId:"kaamon-pilot",storageBucket:"kaamon-pilot.firebasestorage.app",messagingSenderId:"463694330185",appId:"1:463694330185:web:2a445f304195f4cd8f4298"};
+
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+let role=localStorage.getItem("kg_role")||"B",me=localStorage.getItem("kg_me")||"",shifts=[];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const inr=n=>"₹"+Number(n).toLocaleString("en-IN");
+const tag=s=>'<span class="tag">'+({open:"OPEN",accepted:"ACCEPTED",started:"IN PROGRESS",done:"COMPLETED"})[s.status]+'</span>';
+const head=s=>`<b>${esc(s.venue)}</b>${tag(s)}<br>${esc(s.date)}, ${esc(s.time)} · ${s.hours} hrs · ${inr(s.rate)}/hr<br><span class="big">${inr(s.rate*s.hours)}</span>`;
+const upd=(id,d)=>updateDoc(doc(db,"shifts",id),d);
+
+function viewB(){
+ let h=`<div class="card"><b>Post a shift</b><label>Venue</label><input id="v" placeholder="e.g. Third Wave Coffee, 5th Block">
+ <div class="row"><div><label>Day</label><input id="d" placeholder="Sat"></div><div><label>Start</label><input id="t" placeholder="7:00 PM"></div></div>
+ <div class="row"><div><label>Hours</label><input id="h" type="number" value="5"></div><div><label>₹/hr</label><input id="r" type="number" value="200"></div></div>
+ <button class="btn" id="post">Post shift</button></div><b>Your shifts</b>`;
+ if(!shifts.length)h+='<div class="empty">No shifts yet.</div>';
+ shifts.forEach(s=>{h+=`<div class="card ${s.status=="done"?"done":""}">${head(s)}`;
+  if(s.worker)h+=`<br>Waiter: <b>${esc(s.worker)}</b>`;
+  if(s.status=="accepted")h+=`<div>Share this OTP with the waiter on arrival:</div><div class="otp">${s.otp}</div>`;
+  if(s.status=="started")h+=`<button class="btn alt" data-end="${s.id}">Confirm shift finished</button>`;
+  h+="</div>"});return h}
+
+function viewW(){
+ let h=`<label>Your name</label><input id="me" value="${esc(me)}" placeholder="Your name">`;
+ const open=shifts.filter(s=>s.status=="open"),mine=shifts.filter(s=>s.worker==me&&s.status!="open");
+ h+="<p><b>Open shifts nearby</b></p>";
+ if(!open.length)h+='<div class="empty">No open shifts right now.</div>';
+ open.forEach(s=>h+=`<div class="card">${head(s)}<button class="btn" data-acc="${s.id}">Accept shift</button></div>`);
+ h+="<p><b>My shifts</b></p>";
+ if(!mine.length)h+='<div class="empty">Nothing accepted yet.</div>';
+ mine.forEach(s=>{h+=`<div class="card ${s.status=="done"?"done":""}">${head(s)}`;
+  if(s.status=="accepted")h+=`<label>Enter OTP from the business</label><input id="o${s.id}" inputmode="numeric" maxlength="4"><button class="btn" data-go="${s.id}">Start shift</button><div id="e${s.id}" style="color:var(--brick)"></div>`;
+  if(s.status=="started")h+="<div>Shift running.</div>";
+  if(s.status=="done")h+=`<div>Job ticket #${s.id.slice(0,5).toUpperCase()} · You earn <b>${inr(s.rate*s.hours)}</b></div>`;
+  h+="</div>"});return h}
+
+function draw(){
+ if(document.activeElement&&document.activeElement.tagName=="INPUT")return; // don't wipe typing
+ $("tB").className=role=="B"?"on":"";$("tW").className=role=="W"?"on":"";
+ $("app").innerHTML=role=="B"?viewB():viewW()}
+$("tB").onclick=()=>{role="B";localStorage.setItem("kg_role",role);draw()};
+$("tW").onclick=()=>{role="W";localStorage.setItem("kg_role",role);draw()};
+
+$("app").addEventListener("click",async e=>{
+ const t=e.target;
+ try{
+ if(t.id=="post"){const v=$("v").value.trim(),d=$("d").value.trim(),tm=$("t").value.trim(),hr=+$("h").value,rt=+$("r").value;
+  if(!v||!d||!tm||!(hr>0)||!(rt>0))return alert("Please fill all fields.");
+  await addDoc(collection(db,"shifts"),{venue:v,date:d,time:tm,hours:hr,rate:rt,status:"open",worker:"",otp:"",created:serverTimestamp()})}
+ if(t.dataset.acc){const n=$("me").value.trim();if(!n)return alert("Enter your name.");
+  me=n;localStorage.setItem("kg_me",me);
+  await upd(t.dataset.acc,{worker:me,status:"accepted",otp:String(1000+Math.floor(Math.random()*9000))})}
+ if(t.dataset.go){const s=shifts.find(x=>x.id==t.dataset.go);
+  if($("o"+s.id).value.trim()===s.otp)await upd(s.id,{status:"started"});else $("e"+s.id).textContent="Wrong OTP."}
+ if(t.dataset.end)await upd(t.dataset.end,{status:"done"});
+ }catch(err){alert("Could not save: "+err.message)}
+ document.activeElement.blur();draw()});
+$("app").addEventListener("change",e=>{if(e.target.id=="me"){me=e.target.value.trim();localStorage.setItem("kg_me",me);e.target.blur();draw()}});
+
+signInAnonymously(auth).then(()=>{
+ onSnapshot(query(collection(db,"shifts"),orderBy("created","desc")),snap=>{
+  shifts=snap.docs.map(d=>({id:d.id,...d.data()}));draw()},
+  err=>{$("app").innerHTML='<div class="empty">Database error: '+esc(err.message)+'</div>'})
+}).catch(err=>{$("app").innerHTML='<div class="empty">Sign-in failed: '+esc(err.message)+'<br>Check your Firebase config.</div>'});
+</script>
+</body>
+</html>
