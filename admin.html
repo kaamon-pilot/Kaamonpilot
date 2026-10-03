@@ -1,25 +1,34 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kaamgar Admin</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<title>KaamOn Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f4efe4;--card:#fffdf7;--ink:#2b2420;--mut:#7a6d62;--brick:#b5452b;--turm:#e0a31b;--line:#d9cfbc;--ok:#3f7d4e}
-@media (prefers-color-scheme:dark){:root{--bg:#1d1916;--card:#27211d;--ink:#f1e9da;--mut:#a89a8a;--brick:#e0674a;--turm:#e8b43a;--line:#41382f;--ok:#6bb57c}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 "IBM Plex Mono",monospace}
-.w{max-width:560px;margin:0 auto;padding:16px}h1{font-size:18px;margin:0 0 12px}h1 span{color:var(--brick)}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.st{background:var(--card);border:1px dashed var(--line);padding:8px;text-align:center}.st b{display:block;font-size:20px}.st small{color:var(--mut)}
-.f{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.f button{padding:6px 10px;border:1px solid var(--ink);background:transparent;color:var(--ink);font:inherit}
-.f button.on{background:var(--ink);color:var(--bg)}
-.card{background:var(--card);border:1px dashed var(--line);border-left:5px solid var(--turm);padding:10px;margin:8px 0;word-break:break-word}
-.card.done,.card.approved{border-left-color:var(--ok)}.card.cancelled,.card.blocked{border-left-color:var(--mut);opacity:.7}
-.tag{font-size:11px;padding:1px 7px;border:1px solid var(--ink);margin-left:6px}
-.a{display:flex;gap:6px;margin-top:8px}.a button{flex:1;padding:8px;border:0;background:var(--ink);color:var(--bg);font:inherit}
-.a .r{background:var(--brick);color:#fff}.a .g{background:var(--ok);color:#fff}
-a{color:var(--brick)}.empty{color:var(--mut);text-align:center;padding:20px}.big{padding:12px;border:0;background:var(--brick);color:#fff;font:inherit;font-weight:600;width:100%}
+:root{--bg:#F1EEE8;--card:#FFFFFF;--ink:#231F1C;--mut:#6B645D;--brick:#B8432A;--brick2:#962F1A;--onb:#FFFFFF;--turm:#E9A820;--line:#E2DDD3;--ok:#2F7A4B;--sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#171412;--card:#221D1A;--ink:#F3EDE3;--mut:#A59B8F;--brick:#E2694B;--brick2:#C9553A;--onb:#1B0F0B;--turm:#EDB43D;--line:#3A322C;--ok:#5FB07A}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans);-webkit-text-size-adjust:100%}
+a{color:var(--brick)}
+:focus-visible{outline:3px solid var(--turm);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.w{max-width:560px;margin:0 auto;padding:18px 16px 40px}
+h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin:0 0 14px}h1 span{color:var(--turm)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.st{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 6px;text-align:center}
+.st b{display:block;font:600 20px/1.2 var(--mono)}.st small{color:var(--mut);font-size:12px}
+.f{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.f button{height:36px;padding:0 14px;border:1.5px solid var(--line);border-radius:99px;background:var(--card);color:var(--ink);font:inherit;font-size:13px;font-weight:500;cursor:pointer}
+.f button.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0;word-break:break-word}
+.card.done,.card.approved{border-left:5px solid var(--ok)}.card.pending,.card.open{border-left:5px solid var(--turm)}
+.card.full{border-left:5px solid var(--ink)}.card.cancelled,.card.blocked{border-left:5px solid var(--line);opacity:.7}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:1px 9px;border-radius:99px;border:1px solid var(--line);margin-left:6px;background:var(--bg)}
+.a{display:flex;gap:6px;margin-top:10px}
+.a button{flex:1;height:38px;border:0;border-radius:9px;background:var(--ink);color:var(--bg);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.a .r{background:var(--brick);color:var(--onb)}.a .g{background:var(--ok);color:#fff}
+.empty{color:var(--mut);text-align:center;padding:20px}
+.big{height:48px;border:0;border-radius:12px;background:var(--brick);color:var(--onb);font:inherit;font-weight:600;width:100%;cursor:pointer}
 </style></head><body><div class="w">
-<h1>Kaamgar<span>.</span> Admin</h1><div id="main"><div class="empty">Loading...</div></div></div>
+<h1>KaamOn<span>.</span> Admin</h1><div id="main"><div class="empty">Loading...</div></div></div>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,onAuthStateChanged,signOut} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";

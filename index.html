@@ -3,34 +3,64 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kaamgar Pilot</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<title>KaamOn Pilot</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f4efe4;--card:#fffdf7;--ink:#2b2420;--mut:#7a6d62;--brick:#b5452b;--turm:#e0a31b;--line:#d9cfbc;--ok:#3f7d4e}
-@media (prefers-color-scheme:dark){:root{--bg:#1d1916;--card:#27211d;--ink:#f1e9da;--mut:#a89a8a;--brick:#e0674a;--turm:#e8b43a;--line:#41382f;--ok:#6bb57c}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Mono",monospace}
-.w{max-width:480px;margin:0 auto;padding:16px}h1{font-size:18px;margin:0}h1 span{color:var(--brick)}
-.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.sub{color:var(--mut);font-size:12px;margin-bottom:12px}
-.card{background:var(--card);border:1px dashed var(--line);border-left:5px solid var(--turm);padding:12px;margin:10px 0}
-.card.done{border-left-color:var(--ok)}.card.cancelled{opacity:.6}
-label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
-input,select{width:100%;padding:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
-.row{display:flex;gap:8px}.row>*{flex:1}
-.btn{padding:10px;border:0;background:var(--brick);color:#fff;font:inherit;font-weight:600;margin-top:10px;width:100%}
-.btn.alt{background:var(--ink);color:var(--bg)}.btn.sm{width:auto;padding:6px 10px;margin:0;font-size:12px}
-.pick{display:flex;gap:8px;margin-top:6px}.pick button{flex:1;padding:10px;border:2px solid var(--ink);background:transparent;color:var(--ink);font:inherit;font-weight:600}
-.pick button.on{background:var(--brick);border-color:var(--brick);color:#fff}
-.tag{display:inline-block;font-size:11px;padding:1px 7px;border:1px solid var(--ink);margin-left:6px}
-.otp{font-size:26px;letter-spacing:6px;font-weight:600;color:var(--brick)}.big{font-size:20px;font-weight:600}
-.empty{color:var(--mut);text-align:center;padding:24px 0}.err{color:var(--brick)}
+:root{--bg:#F1EEE8;--card:#FFFFFF;--ink:#231F1C;--mut:#6B645D;--brick:#B8432A;--brick2:#962F1A;--onb:#FFFFFF;--turm:#E9A820;--line:#E2DDD3;--ok:#2F7A4B;--sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#171412;--card:#221D1A;--ink:#F3EDE3;--mut:#A59B8F;--brick:#E2694B;--brick2:#C9553A;--onb:#1B0F0B;--turm:#EDB43D;--line:#3A322C;--ok:#5FB07A}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans);-webkit-text-size-adjust:100%}
+a{color:var(--brick)}
+:focus-visible{outline:3px solid var(--turm);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.w{max-width:480px;margin:0 auto;padding:18px 16px 40px}
+.top{display:flex;justify-content:space-between;align-items:center}
+h1{font-size:24px;font-weight:600;letter-spacing:-.02em;margin:0;display:flex;align-items:baseline;gap:2px}
+h1 span{color:var(--turm)}
+h1 small{font-size:12px;font-weight:500;color:var(--mut);letter-spacing:0;margin-left:8px;padding:1px 9px;border:1px solid var(--line);border-radius:99px}
+.sub{color:var(--mut);font-size:13px;margin:2px 0 14px}
+h2{font-size:15px;font-weight:600;color:var(--mut);margin:24px 2px 4px}
+.link{background:none;border:0;color:var(--mut);font:inherit;font-size:13px;text-decoration:underline;padding:8px 0;cursor:pointer}
+.tl{font-size:16px;font-weight:600;color:var(--brick);margin:12px 2px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 16px 14px;margin:12px 0}
+.card.cancelled{opacity:.6}
+.venue{font-size:17px;font-weight:600;letter-spacing:-.01em}
+.tk{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.meta{color:var(--mut);font-size:13px;margin-top:2px}
+.amt{font:600 22px/1.1 var(--mono);text-align:right;white-space:nowrap}
+.amt small{display:block;font:400 11px var(--sans);color:var(--mut);margin-top:3px}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;border:1px solid var(--line);margin:8px 6px 0 0;background:var(--bg)}
+.t-open{background:var(--turm);border-color:transparent;color:#231F1C}
+.t-full{background:var(--ink);border-color:transparent;color:var(--bg)}
+.t-done{background:var(--ok);border-color:transparent;color:#fff}
+.t-cancelled{background:var(--line);color:var(--mut)}
+.ex{font-size:13px;margin-top:6px}
+.ex a{font-weight:500}
+.perf{position:relative;height:0;border:0;border-top:2px dashed var(--line);margin:14px -16px 12px;overflow:visible}
+.perf::before,.perf::after{content:"";position:absolute;top:-11px;width:20px;height:20px;border-radius:50%;background:var(--bg)}
+.perf::before{left:-10px}.perf::after{right:-10px}
+.perf+br{display:none}
+label{display:block;font-size:13px;color:var(--mut);font-weight:500;margin:12px 0 4px}
+input,select{width:100%;height:46px;padding:0 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
+input:focus,select:focus{outline:none;border-color:var(--brick)}
+.row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
+.btn{width:100%;height:48px;margin-top:14px;border:0;border-radius:12px;background:var(--brick);color:var(--onb);font:inherit;font-size:15px;font-weight:600;cursor:pointer;transition:background .15s,transform .08s}
+.btn:active{background:var(--brick2);transform:scale(.99)}
+.btn.alt{background:var(--ink);color:var(--bg)}
+.btn.sm{width:auto;height:34px;padding:0 12px;margin:8px 6px 0 0;font-size:13px;border-radius:9px}
+.pick{display:flex;gap:8px;margin-top:6px}
+.pick button{flex:1;height:44px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.pick button.on{background:var(--brick);border-color:var(--brick);color:var(--onb)}
+.otp{font:600 30px/1 var(--mono);letter-spacing:.3em;color:var(--brick);text-align:center;padding:14px 0 14px .3em;margin:8px 0;border:2px dashed var(--line);border-radius:12px}
+.empty{color:var(--mut);text-align:center;padding:20px 0;font-size:14px}
+.err{color:var(--brick);font-size:13px;margin-top:6px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 <div class="w">
-<div class="top"><h1>Kaamgar<span>.</span> Pilot</h1><span id="who"></span></div>
-<div class="sub">Waiters &amp; helpers · Koramangala, Bengaluru</div>
+<div class="top"><h1>KaamOn<span>.</span><small>Pilot</small></h1><span id="who"></span></div>
+<div class="sub">Waiters and helpers in Koramangala, Bengaluru</div>
 <div id="app"><div class="empty">Loading…</div></div>
 </div>
 <script type="module">
@@ -48,7 +78,7 @@ const TRADE={waiter:"Waiter",helper:"General helper"};
 const W={accepted:"ACCEPTED",started:"IN PROGRESS",done:"COMPLETED"};
 const okMap=u=>/^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|www\.google\.com\/maps|google\.com\/maps|maps\.google\.com)(\/|\?|$)/.test(u||"");
 const slotsOf=s=>Object.entries(s.slots||{}).map(([uid,v])=>({uid,...v}));
-function upiLink(s,w){return "upi://pay?pa="+encodeURIComponent(w.upi||"")+"&pn="+encodeURIComponent(w.name)+"&am="+(s.rate*s.hours).toFixed(2)+"&cu=INR&tn="+encodeURIComponent("Kaamgar shift")}
+function upiLink(s,w){return "upi://pay?pa="+encodeURIComponent(w.upi||"")+"&pn="+encodeURIComponent(w.name)+"&am="+(s.rate*s.hours).toFixed(2)+"&cu=INR&tn="+encodeURIComponent("KaamOn shift")}
 function payBlock(s,w){
  const k=s.id+"|"+w.uid,amt=inr(s.rate*s.hours),upi=(w.pay=="upi"&&w.upi);
  let h=` <span class="tag">${upi?"UPI":"CASH"}</span>`;
@@ -63,10 +93,10 @@ function stat(s){if(s.status=="cancelled")return "cancelled";const L=slotsOf(s);
 
 let user=null,prof=undefined,shifts=[],otps={},contacts={},qrOpen={},unProf=null,unShifts=null,pickRole="waiter",msg="";
 
-function extra(s){return (okMap(s.map)?`<br><a href="${esc(s.map)}" target="_blank" rel="noopener">Open location in Google Maps</a>`:s.address?`<br>Address: ${esc(s.address)}`:"")+(s.dress?`<br>Dress code: ${esc(s.dress)}`:"")+(s.notes?`<br>Note: ${esc(s.notes)}`:"")}
-function head(s){return `<b>${esc(s.venue)}</b><span class="tag">${NAMES[stat(s)]} ${slotsOf(s).length}/${s.needed}</span><br>${TRADE[s.trade||"waiter"]} · ${esc(s.date)}, ${esc(s.time)} · ${s.hours} hrs · ${inr(s.rate)}/hr${extra(s)}<br><span class="big">${inr(s.rate*s.hours)}</span> per waiter`}
+function extra(s){return (okMap(s.map)?`<div class="ex"><a href="${esc(s.map)}" target="_blank" rel="noopener">Open location in Google Maps</a></div>`:s.address?`<div class="ex">Address: ${esc(s.address)}</div>`:"")+(s.dress?`<div class="ex">Dress code: ${esc(s.dress)}</div>`:"")+(s.notes?`<div class="ex">Note: ${esc(s.notes)}</div>`:"")}
+function head(s){return `<div class="tk"><div><b class="venue">${esc(s.venue)}</b><div class="meta">${TRADE[s.trade||"waiter"]} needed ${esc(s.date)}, ${esc(s.time)} for ${s.hours} hrs at ${inr(s.rate)}/hr</div></div><div class="amt">${inr(s.rate*s.hours)}<small>per worker</small></div></div><span class="tag t-${stat(s)}">${NAMES[stat(s)]} ${slotsOf(s).length}/${s.needed}</span>${extra(s)}<hr class="perf">`}
 
-function viewLogin(){return `<div class="card"><b>Welcome</b><p>Sign in with your Google account to continue.</p><button class="btn" id="login">Sign in with Google</button><div class="err" id="m">${esc(msg)}</div></div>`}
+function viewLogin(){return `<div class="card"><b class="venue">Welcome to KaamOn</b><p>Sign in with Google to post or take shifts.</p><button class="btn" id="login">Sign in with Google</button><div class="err" id="m">${esc(msg)}</div></div>`}
 
 function viewRegister(){return `<div class="card"><b>Create your profile</b>
 <label>I am a</label><div class="pick"><button data-pick="business" class="${pickRole=="business"?"on":""}">Business</button><button data-pick="waiter" class="${pickRole=="waiter"?"on":""}">Waiter</button><button data-pick="helper" class="${pickRole=="helper"?"on":""}">General helper</button></div>
@@ -75,10 +105,10 @@ function viewRegister(){return `<div class="card"><b>Create your profile</b>
 <button class="btn" id="reg">Submit for approval</button><div class="err" id="m">${esc(msg)}</div></div>`}
 
 function viewPending(){return `<div class="card"><b>Waiting for approval</b><p>Thanks, ${esc(prof.name)}. We will call or WhatsApp ${esc(prof.phone)} to verify you. Once approved, reopen this page.</p></div>`}
-function viewBlocked(){return `<div class="card"><b>Account not active</b><p>Please contact the Kaamgar team.</p></div>`}
+function viewBlocked(){return `<div class="card"><b>Account not active</b><p>Please contact the KaamOn team.</p></div>`}
 
 function viewB(){
- let h=`<div class="card"><b>Post a shift</b><label>Venue</label><input id="v" placeholder="e.g. Third Wave Coffee, 5th Block">
+ let h=`<div class="tl">Insta help on one tap.</div><div class="card"><b class="venue">Post a shift</b><label>Venue</label><input id="v" placeholder="e.g. Third Wave Coffee, 5th Block">
  <div class="row"><div><label>Day</label><input id="d" placeholder="Sat"></div><div><label>Start</label><input id="t" placeholder="7:00 PM"></div></div>
  <label>Worker needed</label><select id="tr"><option value="waiter">Waiter</option><option value="helper">General helper</option></select>
  <div class="row"><div><label>Hours</label><input id="h" type="number" value="5"></div><div><label>₹/hr</label><input id="r" type="number" value="200"></div><div><label>Workers</label><input id="nd" type="number" min="1" max="20" value="1"></div></div>
@@ -86,7 +116,7 @@ function viewB(){
  <label>Dress code</label><input id="dc" placeholder="e.g. black shirt, black pants">
  <label>Notes for waiter</label><input id="nt" placeholder="e.g. Report to manager Suresh">
  <label>Contact number for this shift</label><input id="cp" inputmode="numeric" maxlength="10" value="${esc(prof.phone)}">
- <button class="btn" id="post">Post shift</button><div class="err" id="m">${esc(msg)}</div></div><b>Your shifts</b>`;
+ <button class="btn" id="post">Post shift</button><div class="err" id="m">${esc(msg)}</div></div><h2>Your shifts</h2>`;
  if(!shifts.length)h+='<div class="empty">No shifts yet.</div>';
  shifts.forEach(s=>{h+=`<div class="card ${stat(s)}">${head(s)}`;
   h+=`<br>Total for ${s.needed}: <b>${inr(s.rate*s.hours*s.needed)}</b>`;
@@ -97,10 +127,10 @@ function viewB(){
 
 function viewW(){
  const open=shifts.filter(s=>stat(s)=="open"&&(s.trade||"waiter")==prof.role&&!(s.slots||{})[user.uid]),mine=shifts.filter(s=>(s.slots||{})[user.uid]);
- let h="<p><b>Open shifts nearby</b></p>";
+ let h="<h2>Open shifts nearby</h2>";
  if(!open.length)h+='<div class="empty">No open shifts right now.</div>';
  open.forEach(s=>h+=`<div class="card">${head(s)}<br>By ${esc(s.ownerName||"")} · ${s.needed-slotsOf(s).length} spot(s) left<label>How do you want to be paid?</label><select id="pm${s.id}"><option value="cash">Cash</option><option value="upi">Online payment (QR / UPI)</option></select><label>Your UPI ID (for online payment)</label><input id="up${s.id}" placeholder="name@bank" value="${esc(upiSaved())}"><button class="btn" data-acc="${s.id}">Accept shift</button></div>`);
- h+="<p><b>My shifts</b></p>";
+ h+="<h2>My shifts</h2>";
  if(!mine.length)h+='<div class="empty">Nothing accepted yet.</div>';
  mine.forEach(s=>{const my=s.slots[user.uid];h+=`<div class="card ${my.status=="done"?"done":""}">${head(s)}${contacts[s.id]?`<br>Contact: <a href="tel:${esc(contacts[s.id])}">${esc(contacts[s.id])}</a>`:""}`;
   h+=`<br>Payment: ${my.pay=="upi"?"Online (UPI) · "+esc(my.upi||""):"Cash"}${my.received?" · <b>Receipt confirmed</b>":my.paid?" · <b>Marked paid by business</b>":""}`;
@@ -114,7 +144,7 @@ function viewW(){
 
 function draw(){
  if(document.activeElement&&document.activeElement.tagName=="INPUT")return;
- $("who").innerHTML=user?`<button class="btn sm alt" id="out">Sign out</button>`:"";
+ $("who").innerHTML=user?`<button class="link" id="out">Sign out</button>`:"";
  let h;
  if(!user)h=viewLogin();
  else if(prof===undefined)h='<div class="empty">Loading…</div>';
