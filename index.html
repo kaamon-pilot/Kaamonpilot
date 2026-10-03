@@ -25,6 +25,7 @@ input,select{width:100%;padding:9px;border:1px solid var(--line);background:var(
 .otp{font-size:26px;letter-spacing:6px;font-weight:600;color:var(--brick)}.big{font-size:20px;font-weight:600}
 .empty{color:var(--mut);text-align:center;padding:24px 0}.err{color:var(--brick)}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 <div class="w">
@@ -47,9 +48,19 @@ const TRADE={waiter:"Waiter",helper:"General helper"};
 const W={accepted:"ACCEPTED",started:"IN PROGRESS",done:"COMPLETED"};
 const okMap=u=>/^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|www\.google\.com\/maps|google\.com\/maps|maps\.google\.com)(\/|\?|$)/.test(u||"");
 const slotsOf=s=>Object.entries(s.slots||{}).map(([uid,v])=>({uid,...v}));
+function upiLink(s,w){return "upi://pay?pa="+encodeURIComponent(w.upi||"")+"&pn="+encodeURIComponent(w.name)+"&am="+(s.rate*s.hours).toFixed(2)+"&cu=INR&tn="+encodeURIComponent("Kaamgar shift")}
+function payBlock(s,w){
+ const k=s.id+"|"+w.uid,amt=inr(s.rate*s.hours),upi=(w.pay=="upi"&&w.upi);
+ let h=` <span class="tag">${upi?"UPI":"CASH"}</span>`;
+ if(w.status!="done")return h;
+ if(w.paid)return h+" <b>Paid</b>";
+ h+=upi?`<div>Pay ${amt} to ${esc(w.upi)}</div><button class="btn sm alt" data-qr="${k}">${qrOpen[k]?"Hide":"Show"} QR</button> <a href="${esc(upiLink(s,w))}">Open UPI app</a>`+(qrOpen[k]?`<div data-upi="${esc(upiLink(s,w))}" style="background:#fff;padding:8px;display:inline-block;margin:6px 0"></div>`:"")
+  :`<div>Pay ${amt} in cash.</div>`;
+ return h+` <button class="btn sm" data-paid="${k}">Mark paid</button>`}
+function upiSaved(){try{return localStorage.getItem("kg_upi")||""}catch(e){return ""}}
 function stat(s){if(s.status=="cancelled")return "cancelled";const L=slotsOf(s);if(L.length&&L.filter(w=>w.status=="done").length>=s.needed)return "done";if(L.length>=s.needed)return "full";return "open"}
 
-let user=null,prof=undefined,shifts=[],otps={},contacts={},unProf=null,unShifts=null,pickRole="waiter",msg="";
+let user=null,prof=undefined,shifts=[],otps={},contacts={},qrOpen={},unProf=null,unShifts=null,pickRole="waiter",msg="";
 
 function extra(s){return (okMap(s.map)?`<br><a href="${esc(s.map)}" target="_blank" rel="noopener">Open location in Google Maps</a>`:s.address?`<br>Address: ${esc(s.address)}`:"")+(s.dress?`<br>Dress code: ${esc(s.dress)}`:"")+(s.notes?`<br>Note: ${esc(s.notes)}`:"")}
 function head(s){return `<b>${esc(s.venue)}</b><span class="tag">${NAMES[stat(s)]} ${slotsOf(s).length}/${s.needed}</span><br>${TRADE[s.trade||"waiter"]} · ${esc(s.date)}, ${esc(s.time)} · ${s.hours} hrs · ${inr(s.rate)}/hr${extra(s)}<br><span class="big">${inr(s.rate*s.hours)}</span> per waiter`}
@@ -79,7 +90,7 @@ function viewB(){
  shifts.forEach(s=>{h+=`<div class="card ${stat(s)}">${head(s)}`;
   h+=`<br>Total for ${s.needed}: <b>${inr(s.rate*s.hours*s.needed)}</b>`;
   const L=slotsOf(s);
-  L.forEach(w=>{h+=`<br>${esc(w.name)} <span class="tag">${W[w.status]||""}</span>`+(w.status=="started"?` <button class="btn sm alt" data-end="${s.id}|${w.uid}">Confirm finished</button>`:"")});
+  L.forEach(w=>{h+=`<br>${esc(w.name)} <span class="tag">${W[w.status]||""}</span>`+payBlock(s,w)+(w.status=="started"?` <button class="btn sm alt" data-end="${s.id}|${w.uid}">Confirm finished</button>`:"")});
   if(L.some(w=>w.status=="accepted"))h+=`<div>Share this OTP with waiters on arrival:</div><div class="otp">${esc(otps[s.id]||"…")}</div>`;
   h+="</div>"});return h}
 
@@ -87,10 +98,11 @@ function viewW(){
  const open=shifts.filter(s=>stat(s)=="open"&&(s.trade||"waiter")==prof.role&&!(s.slots||{})[user.uid]),mine=shifts.filter(s=>(s.slots||{})[user.uid]);
  let h="<p><b>Open shifts nearby</b></p>";
  if(!open.length)h+='<div class="empty">No open shifts right now.</div>';
- open.forEach(s=>h+=`<div class="card">${head(s)}<br>By ${esc(s.ownerName||"")} · ${s.needed-slotsOf(s).length} spot(s) left<button class="btn" data-acc="${s.id}">Accept shift</button></div>`);
+ open.forEach(s=>h+=`<div class="card">${head(s)}<br>By ${esc(s.ownerName||"")} · ${s.needed-slotsOf(s).length} spot(s) left<label>How do you want to be paid?</label><select id="pm${s.id}"><option value="cash">Cash</option><option value="upi">Online payment (QR / UPI)</option></select><label>Your UPI ID (for online payment)</label><input id="up${s.id}" placeholder="name@bank" value="${esc(upiSaved())}"><button class="btn" data-acc="${s.id}">Accept shift</button></div>`);
  h+="<p><b>My shifts</b></p>";
  if(!mine.length)h+='<div class="empty">Nothing accepted yet.</div>';
  mine.forEach(s=>{const my=s.slots[user.uid];h+=`<div class="card ${my.status=="done"?"done":""}">${head(s)}${contacts[s.id]?`<br>Contact: <a href="tel:${esc(contacts[s.id])}">${esc(contacts[s.id])}</a>`:""}`;
+  h+=`<br>Payment: ${my.pay=="upi"?"Online (UPI) · "+esc(my.upi||""):"Cash"}${my.paid?" · <b>Paid</b>":""}`;
   if(s.status=="cancelled")h+="<br><b>This shift was cancelled.</b>";
   else if(my.status=="accepted")h+=`<label>Enter OTP from the business</label><input id="o${s.id}" inputmode="numeric" maxlength="4"><button class="btn" data-go="${s.id}">Start shift</button><div class="err" id="e${s.id}"></div>`;
   else if(my.status=="started")h+="<div>Shift running.</div>";
@@ -108,9 +120,10 @@ function draw(){
  else if(prof.status=="pending")h=viewPending();
  else if(prof.status!="approved")h=viewBlocked();
  else h=prof.role=="business"?viewB():viewW();
- $("app").innerHTML=h}
+ $("app").innerHTML=h;
+ document.querySelectorAll("[data-upi]").forEach(el=>{el.innerHTML="";if(typeof QRCode!="undefined")new QRCode(el,{text:el.dataset.upi,width:180,height:180})})}
 
-function stop(){if(unProf)unProf();if(unShifts)unShifts();unProf=unShifts=null;shifts=[];otps={};contacts={}}
+function stop(){if(unProf)unProf();if(unShifts)unShifts();unProf=unShifts=null;shifts=[];otps={};contacts={};qrOpen={}}
 function subShifts(){
  if(unShifts)return;
  const q=prof.role=="business"?query(collection(db,"shifts"),where("owner","==",user.uid)):query(collection(db,"shifts"),orderBy("created","desc"));
@@ -158,9 +171,15 @@ document.addEventListener("click",async e=>{
   b.set(doc(db,"shifts",ref.id,"secret","otp"),{code:String(1000+Math.floor(Math.random()*9000))});
   b.set(doc(db,"shifts",ref.id,"secret","contact"),{phone:cp});
   await b.commit()}
- else if(t.dataset.acc){try{await updateDoc(doc(db,"shifts",t.dataset.acc),{["slots."+user.uid]:{name:prof.name,status:"accepted"}})}catch(err){msg="Could not accept. The shift may just have been filled.";draw();return}}
+ else if(t.dataset.acc){const id=t.dataset.acc,pm=$("pm"+id).value,up=$("up"+id).value.trim();
+  if(pm=="upi"&&!/^[\w.\-]{2,}@[A-Za-z]{2,}$/.test(up)){msg="Enter a valid UPI ID like name@bank, or choose Cash.";draw();return}
+  if(pm=="upi"){try{localStorage.setItem("kg_upi",up)}catch(e){}}
+  const slot={name:prof.name,status:"accepted",pay:pm};if(pm=="upi")slot.upi=up;
+  try{await updateDoc(doc(db,"shifts",id),{["slots."+user.uid]:slot})}catch(err){msg="Could not accept. The shift may just have been filled.";draw();return}}
  else if(t.dataset.go){const id=t.dataset.go,v=$("o"+id).value.trim();
   try{await updateDoc(doc(db,"shifts",id),{["slots."+user.uid+".status"]:"started",["slots."+user.uid+".otpTry"]:v})}catch(err){$("e"+id).textContent="Wrong OTP. Ask the business again.";return}}
+ else if(t.dataset.paid){const p=t.dataset.paid.split("|");await updateDoc(doc(db,"shifts",p[0]),{["slots."+p[1]+".paid"]:true})}
+ else if(t.dataset.qr){qrOpen[t.dataset.qr]=!qrOpen[t.dataset.qr]}
  else if(t.dataset.end){const p=t.dataset.end.split("|");await updateDoc(doc(db,"shifts",p[0]),{["slots."+p[1]+".status"]:"done"})}
  else return;
  }catch(err){msg="Could not save: "+err.message;const m=$("m");if(m)m.textContent=msg}
