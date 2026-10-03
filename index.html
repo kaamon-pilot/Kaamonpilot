@@ -66,6 +66,10 @@ input:focus,select:focus{outline:none;border-color:var(--brick)}
 .t-expired{background:var(--line);color:var(--mut)}
 input[id^=rc_]{height:40px;margin-top:8px;font-size:14px}
 input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-height:46px}
+.ck{display:flex;gap:10px;align-items:center;margin-top:14px;font-size:14px;font-weight:500;color:var(--ink)}
+.ck input{width:20px;height:20px;flex:none;accent-color:var(--brick)}
+.t-now{background:var(--brick);border-color:transparent;color:var(--onb)}
+input:disabled,select:disabled{opacity:.45}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
@@ -98,6 +102,7 @@ const pad=n=>String(n).padStart(2,"0");
 const fmtClock=ms=>{ms=Math.max(0,Math.floor(ms/1000));return pad(Math.floor(ms/3600))+":"+pad(Math.floor(ms%3600/60))+":"+pad(ms%60)};
 const fmtDur=ms=>{const m=Math.max(0,Math.round(ms/60000));return Math.floor(m/60)+"h "+pad(m%60)+"m"};
 const todayISO=()=>{const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())};
+function tm12(){const h=$("th").value,m=$("tmn").value,ap=$("tap").value;if(!h||!m)return "";return pad((+h%12)+(ap=="PM"?12:0))+":"+m}
 function whenText(s){let t=fmtDate(s.date)+", "+fmtT(s.time);if(s.startAt){const e=s.startAt+s.hours*3600000;t+=" to "+fmtMs(e)+(new Date(e).toDateString()!=new Date(s.startAt).toDateString()?" (next day)":"")}return t}
 function timeLine(w){const st=tsMs(w.startedAt),en=tsMs(w.endedAt);
  if(w.status=="started"&&st)return `<div class="clock-row">Started ${fmtMs(st)}, working <span class="clk" data-clock="${st}">00:00:00</span></div>`;
@@ -128,7 +133,7 @@ function stat(s){if(s.status=="cancelled")return "cancelled";const L=slotsOf(s);
 let user=null,prof=undefined,shifts=[],otps={},contacts={},qrOpen={},ratings=[],AV={},unRat=null,unProf=null,unShifts=null,pickRole="waiter",msg="";
 
 function extra(s){return (okMap(s.map)?`<div class="ex"><a href="${esc(s.map)}" target="_blank" rel="noopener">Open location in Google Maps</a></div>`:s.address?`<div class="ex">Address: ${esc(s.address)}</div>`:"")+(s.dress?`<div class="ex">Dress code: ${esc(s.dress)}</div>`:"")+(s.notes?`<div class="ex">Note: ${esc(s.notes)}</div>`:"")}
-function head(s){return `<div class="tk"><div><b class="venue">${esc(s.venue)}</b><div class="meta">${TRADE[s.trade||"waiter"]} needed ${esc(whenText(s))} for ${s.hours} hrs at ${inr(s.rate)}/hr</div></div><div class="amt">${inr(s.rate*s.hours)}<small>per worker</small></div></div><span class="tag t-${stat(s)}">${NAMES[stat(s)]} ${slotsOf(s).length}/${s.needed}</span>${extra(s)}${s.created&&stamp(s.created)?`<div class="ex mut">Posted ${stamp(s.created)}</div>`:""}<hr class="perf">`}
+function head(s){return `<div class="tk"><div><b class="venue">${esc(s.venue)}</b><div class="meta">${TRADE[s.trade||"waiter"]} needed ${esc(whenText(s))} for ${s.hours} hrs at ${inr(s.rate)}/hr</div></div><div class="amt">${inr(s.rate*s.hours)}<small>per worker</small></div></div><span class="tag t-${stat(s)}">${NAMES[stat(s)]} ${slotsOf(s).length}/${s.needed}</span>${s.startNow?'<span class="tag t-now">NEEDED NOW</span>':""}${extra(s)}${s.created&&stamp(s.created)?`<div class="ex mut">Posted ${stamp(s.created)}</div>`:""}<hr class="perf">`}
 
 function viewLogin(){return `<div class="card"><b class="venue">Welcome to KaamOn</b><p>Sign in with Google to post or take shifts.</p><button class="btn" id="login">Sign in with Google</button><div class="err" id="m">${esc(msg)}</div></div>`}
 
@@ -143,7 +148,9 @@ function viewBlocked(){return `<div class="card"><b>Account not active</b><p>Ple
 
 function viewB(){
  let h=`<div class="tl">Insta help on one tap.</div><div class="card"><b class="venue">Post a shift</b><label>Venue</label><input id="v" placeholder="e.g. Third Wave Coffee, 5th Block">
- <div class="row"><div><label>Date</label><input id="d" type="date" min="${todayISO()}"></div><div><label>Start time</label><input id="t" type="time"></div></div>
+ <label class="ck"><input type="checkbox" id="now"> Needed now (starts right away)</label>
+ <label>Date</label><input id="d" type="date" min="${todayISO()}">
+ <label>Start time</label><div class="row"><select id="th"><option value="">Hour</option>${[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>`<option>${n}</option>`).join("")}</select><select id="tmn"><option value="">Min</option>${["00","05","10","15","20","25","30","35","40","45","50","55"].map(n=>`<option>${n}</option>`).join("")}</select><select id="tap"><option>AM</option><option>PM</option></select></div>
  <label>Worker needed</label><select id="tr"><option value="waiter">Waiter</option><option value="helper">General helper</option></select>
  <div class="row"><div><label>Hours</label><input id="h" type="number" value="5"></div><div><label>₹/hr</label><input id="r" type="number" value="200"></div><div><label>Workers</label><input id="nd" type="number" min="1" max="20" value="1"></div></div>
  <label>Location (Google Maps)</label><input id="ml" placeholder="Paste Google Maps link"><button class="btn sm alt" id="loc" style="margin-top:6px">Use my current location</button><div class="sub">Or in Google Maps: open the place, tap Share, copy the link.</div>
@@ -178,7 +185,7 @@ function viewW(){
  return h+`<div class="err">${esc(msg)}</div>`}
 
 function draw(){
- if(document.activeElement&&document.activeElement.tagName=="INPUT")return;
+ if(document.activeElement&&(document.activeElement.tagName=="INPUT"||document.activeElement.tagName=="SELECT"))return;
  $("who").innerHTML=user?`<button class="link" id="out">Sign out</button>`:"";
  let h;
  if(!user)h=viewLogin();
@@ -229,15 +236,15 @@ document.addEventListener("click",async e=>{
  else if(t.id=="reg"){const nm=$("nm").value.trim(),ph=$("ph").value.trim();
   if(nm.length<2||!/^[6-9]\d{9}$/.test(ph)){msg="Enter a valid name and 10-digit mobile number.";$("m").textContent=msg;return}
   await setDoc(doc(db,"users",user.uid),{name:nm,phone:ph,role:pickRole,status:"pending",email:user.email||"",created:serverTimestamp()})}
- else if(t.id=="post"){const v=$("v").value.trim(),d=$("d").value.trim(),tm=$("t").value.trim(),hr=+$("h").value,rt=+$("r").value,nd=Math.floor(+$("nd").value),tr=$("tr").value,ml=$("ml").value.trim(),dc=$("dc").value.trim(),nt=$("nt").value.trim(),cp=$("cp").value.trim();
+ else if(t.id=="post"){const v=$("v").value.trim(),nw=$("now").checked,d=nw?todayISO():$("d").value.trim(),tm=nw?(pad(new Date().getHours())+":"+pad(new Date().getMinutes())):tm12(),hr=+$("h").value,rt=+$("r").value,nd=Math.floor(+$("nd").value),tr=$("tr").value,ml=$("ml").value.trim(),dc=$("dc").value.trim(),nt=$("nt").value.trim(),cp=$("cp").value.trim();
   if(!v||!d||!tm||!(hr>0)||!(rt>0)){$("m").textContent="Please fill venue, date, start time, hours and rate.";return}
-  const startAt=new Date(d+"T"+tm).getTime();
-  if(!(startAt>Date.now())){$("m").textContent="Choose a date and start time in the future.";return}
+  const startAt=nw?Date.now():new Date(d+"T"+tm).getTime();
+  if(!nw&&!(startAt>Date.now())){$("m").textContent="Choose a date and start time in the future.";return}
   if(!okMap(ml)){$("m").textContent="Add a Google Maps location: paste a Maps link or tap Use my current location.";return}
   if(!(nd>=1&&nd<=20)){$("m").textContent="Workers needed must be between 1 and 20.";return}
   if(!/^[6-9]\d{9}$/.test(cp)){$("m").textContent="Enter a valid 10-digit contact number.";return}
   const ref=doc(collection(db,"shifts")),b=writeBatch(db);
-  b.set(ref,{venue:v,date:d,time:tm,startAt:startAt,hours:hr,rate:rt,map:ml,dress:dc,notes:nt,trade:tr,needed:nd,slots:{},status:"open",owner:user.uid,ownerName:prof.name,created:serverTimestamp()});
+  b.set(ref,{venue:v,date:d,time:tm,startAt:startAt,startNow:nw,hours:hr,rate:rt,map:ml,dress:dc,notes:nt,trade:tr,needed:nd,slots:{},status:"open",owner:user.uid,ownerName:prof.name,created:serverTimestamp()});
   b.set(doc(db,"shifts",ref.id,"secret","otp"),{code:String(1000+Math.floor(Math.random()*9000))});
   b.set(doc(db,"shifts",ref.id,"secret","contact"),{phone:cp});
   await b.commit()}
@@ -258,6 +265,7 @@ document.addEventListener("click",async e=>{
  else return;
  }catch(err){msg="Could not save: "+err.message;const m=$("m");if(m)m.textContent=msg}
  document.activeElement.blur();draw()});
+document.addEventListener("change",e=>{if(e.target.id=="now"){["d","th","tmn","tap"].forEach(i=>{const el=$(i);if(el){el.disabled=e.target.checked;if(e.target.checked&&i=="d")el.value=""}})}});
 </script>
 </body>
 </html>
