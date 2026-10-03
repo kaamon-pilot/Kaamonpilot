@@ -45,12 +45,13 @@ const inr=n=>"₹"+Number(n).toLocaleString("en-IN");
 const NAMES={open:"OPEN",full:"FULL",done:"COMPLETED",cancelled:"CANCELLED"};
 const TRADE={waiter:"Waiter",helper:"General helper"};
 const W={accepted:"ACCEPTED",started:"IN PROGRESS",done:"COMPLETED"};
+const okMap=u=>/^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|www\.google\.com\/maps|google\.com\/maps|maps\.google\.com)(\/|\?|$)/.test(u||"");
 const slotsOf=s=>Object.entries(s.slots||{}).map(([uid,v])=>({uid,...v}));
 function stat(s){if(s.status=="cancelled")return "cancelled";const L=slotsOf(s);if(L.length&&L.filter(w=>w.status=="done").length>=s.needed)return "done";if(L.length>=s.needed)return "full";return "open"}
 
 let user=null,prof=undefined,shifts=[],otps={},contacts={},unProf=null,unShifts=null,pickRole="waiter",msg="";
 
-function extra(s){return (s.address?`<br>Address: ${esc(s.address)}`:"")+(s.dress?`<br>Dress code: ${esc(s.dress)}`:"")+(s.notes?`<br>Note: ${esc(s.notes)}`:"")}
+function extra(s){return (okMap(s.map)?`<br><a href="${esc(s.map)}" target="_blank" rel="noopener">Open location in Google Maps</a>`:s.address?`<br>Address: ${esc(s.address)}`:"")+(s.dress?`<br>Dress code: ${esc(s.dress)}`:"")+(s.notes?`<br>Note: ${esc(s.notes)}`:"")}
 function head(s){return `<b>${esc(s.venue)}</b><span class="tag">${NAMES[stat(s)]} ${slotsOf(s).length}/${s.needed}</span><br>${TRADE[s.trade||"waiter"]} · ${esc(s.date)}, ${esc(s.time)} · ${s.hours} hrs · ${inr(s.rate)}/hr${extra(s)}<br><span class="big">${inr(s.rate*s.hours)}</span> per waiter`}
 
 function viewLogin(){return `<div class="card"><b>Welcome</b><p>Sign in with your Google account to continue.</p><button class="btn" id="login">Sign in with Google</button><div class="err" id="m">${esc(msg)}</div></div>`}
@@ -69,7 +70,7 @@ function viewB(){
  <div class="row"><div><label>Day</label><input id="d" placeholder="Sat"></div><div><label>Start</label><input id="t" placeholder="7:00 PM"></div></div>
  <label>Worker needed</label><select id="tr"><option value="waiter">Waiter</option><option value="helper">General helper</option></select>
  <div class="row"><div><label>Hours</label><input id="h" type="number" value="5"></div><div><label>₹/hr</label><input id="r" type="number" value="200"></div><div><label>Workers</label><input id="nd" type="number" min="1" max="20" value="1"></div></div>
- <label>Address / location</label><input id="ad" placeholder="Street, area, landmark">
+ <label>Location (Google Maps)</label><input id="ml" placeholder="Paste Google Maps link"><button class="btn sm alt" id="loc" style="margin-top:6px">Use my current location</button><div class="sub">Or in Google Maps: open the place, tap Share, copy the link.</div>
  <label>Dress code</label><input id="dc" placeholder="e.g. black shirt, black pants">
  <label>Notes for waiter</label><input id="nt" placeholder="e.g. Report to manager Suresh">
  <label>Contact number for this shift</label><input id="cp" inputmode="numeric" maxlength="10" value="${esc(prof.phone)}">
@@ -132,7 +133,13 @@ onAuthStateChanged(auth,u=>{
  draw()});
 
 document.addEventListener("click",async e=>{
- const t=e.target;if(t.tagName!=="BUTTON")return;msg="";
+ const t=e.target;if(t.tagName!=="BUTTON")return;
+ if(t.id=="loc"){const m=$("m");
+  if(!navigator.geolocation){m.textContent="Location not available. Paste a Maps link instead.";return}
+  m.textContent="Getting location...";
+  navigator.geolocation.getCurrentPosition(p=>{$("ml").value="https://www.google.com/maps?q="+p.coords.latitude.toFixed(6)+","+p.coords.longitude.toFixed(6);m.textContent="Location added."},()=>{m.textContent="Could not get location. Allow location access, or paste a Maps link."},{enableHighAccuracy:true,timeout:15000});
+  return}
+ msg="";
  try{
  if(t.id=="login"){const p=new GoogleAuthProvider();
   try{await signInWithPopup(auth,p)}catch(err){if(err.code=="auth/popup-blocked"||err.code=="auth/operation-not-supported-in-this-environment")await signInWithRedirect(auth,p);else if(err.code!="auth/popup-closed-by-user"&&err.code!="auth/cancelled-popup-request")throw err}}
@@ -141,12 +148,13 @@ document.addEventListener("click",async e=>{
  else if(t.id=="reg"){const nm=$("nm").value.trim(),ph=$("ph").value.trim();
   if(nm.length<2||!/^[6-9]\d{9}$/.test(ph)){msg="Enter a valid name and 10-digit mobile number.";$("m").textContent=msg;return}
   await setDoc(doc(db,"users",user.uid),{name:nm,phone:ph,role:pickRole,status:"pending",email:user.email||"",created:serverTimestamp()})}
- else if(t.id=="post"){const v=$("v").value.trim(),d=$("d").value.trim(),tm=$("t").value.trim(),hr=+$("h").value,rt=+$("r").value,nd=Math.floor(+$("nd").value),tr=$("tr").value,ad=$("ad").value.trim(),dc=$("dc").value.trim(),nt=$("nt").value.trim(),cp=$("cp").value.trim();
-  if(!v||!d||!tm||!ad||!(hr>0)||!(rt>0)){$("m").textContent="Please fill venue, day, start, hours, rate and address.";return}
+ else if(t.id=="post"){const v=$("v").value.trim(),d=$("d").value.trim(),tm=$("t").value.trim(),hr=+$("h").value,rt=+$("r").value,nd=Math.floor(+$("nd").value),tr=$("tr").value,ml=$("ml").value.trim(),dc=$("dc").value.trim(),nt=$("nt").value.trim(),cp=$("cp").value.trim();
+  if(!v||!d||!tm||!(hr>0)||!(rt>0)){$("m").textContent="Please fill venue, day, start, hours and rate.";return}
+  if(!okMap(ml)){$("m").textContent="Add a Google Maps location: paste a Maps link or tap Use my current location.";return}
   if(!(nd>=1&&nd<=20)){$("m").textContent="Workers needed must be between 1 and 20.";return}
   if(!/^[6-9]\d{9}$/.test(cp)){$("m").textContent="Enter a valid 10-digit contact number.";return}
   const ref=doc(collection(db,"shifts")),b=writeBatch(db);
-  b.set(ref,{venue:v,date:d,time:tm,hours:hr,rate:rt,address:ad,dress:dc,notes:nt,trade:tr,needed:nd,slots:{},status:"open",owner:user.uid,ownerName:prof.name,created:serverTimestamp()});
+  b.set(ref,{venue:v,date:d,time:tm,hours:hr,rate:rt,map:ml,dress:dc,notes:nt,trade:tr,needed:nd,slots:{},status:"open",owner:user.uid,ownerName:prof.name,created:serverTimestamp()});
   b.set(doc(db,"shifts",ref.id,"secret","otp"),{code:String(1000+Math.floor(Math.random()*9000))});
   b.set(doc(db,"shifts",ref.id,"secret","contact"),{phone:cp});
   await b.commit()}
