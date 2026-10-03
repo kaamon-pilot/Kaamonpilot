@@ -53,11 +53,12 @@ function payBlock(s,w){
  const k=s.id+"|"+w.uid,amt=inr(s.rate*s.hours),upi=(w.pay=="upi"&&w.upi);
  let h=` <span class="tag">${upi?"UPI":"CASH"}</span>`;
  if(w.status!="done")return h;
- if(w.paid)return h+" <b>Paid</b>";
+ if(w.paid)return h+(w.received?" <b>Paid · receipt confirmed</b>":" <b>Paid</b> · waiting for worker to confirm");
  h+=upi?`<div>Pay ${amt} to ${esc(w.upi)}</div><button class="btn sm alt" data-qr="${k}">${qrOpen[k]?"Hide":"Show"} QR</button> <a href="${esc(upiLink(s,w))}">Open UPI app</a>`+(qrOpen[k]?`<div data-upi="${esc(upiLink(s,w))}" style="background:#fff;padding:8px;display:inline-block;margin:6px 0"></div>`:"")
   :`<div>Pay ${amt} in cash.</div>`;
  return h+` <button class="btn sm" data-paid="${k}">Mark paid</button>`}
 function upiSaved(){try{return localStorage.getItem("kg_upi")||""}catch(e){return ""}}
+const find=id=>shifts.filter(x=>x.id==id)[0];
 function stat(s){if(s.status=="cancelled")return "cancelled";const L=slotsOf(s);if(L.length&&L.filter(w=>w.status=="done").length>=s.needed)return "done";if(L.length>=s.needed)return "full";return "open"}
 
 let user=null,prof=undefined,shifts=[],otps={},contacts={},qrOpen={},unProf=null,unShifts=null,pickRole="waiter",msg="";
@@ -102,7 +103,8 @@ function viewW(){
  h+="<p><b>My shifts</b></p>";
  if(!mine.length)h+='<div class="empty">Nothing accepted yet.</div>';
  mine.forEach(s=>{const my=s.slots[user.uid];h+=`<div class="card ${my.status=="done"?"done":""}">${head(s)}${contacts[s.id]?`<br>Contact: <a href="tel:${esc(contacts[s.id])}">${esc(contacts[s.id])}</a>`:""}`;
-  h+=`<br>Payment: ${my.pay=="upi"?"Online (UPI) · "+esc(my.upi||""):"Cash"}${my.paid?" · <b>Paid</b>":""}`;
+  h+=`<br>Payment: ${my.pay=="upi"?"Online (UPI) · "+esc(my.upi||""):"Cash"}${my.received?" · <b>Receipt confirmed</b>":my.paid?" · <b>Marked paid by business</b>":""}`;
+  if(my.paid&&!my.received)h+=`<br><button class="btn" data-recv="${s.id}">Confirm payment received</button>`;
   if(s.status=="cancelled")h+="<br><b>This shift was cancelled.</b>";
   else if(my.status=="accepted")h+=`<label>Enter OTP from the business</label><input id="o${s.id}" inputmode="numeric" maxlength="4"><button class="btn" data-go="${s.id}">Start shift</button><div class="err" id="e${s.id}"></div>`;
   else if(my.status=="started")h+="<div>Shift running.</div>";
@@ -179,6 +181,7 @@ document.addEventListener("click",async e=>{
  else if(t.dataset.go){const id=t.dataset.go,v=$("o"+id).value.trim();
   try{await updateDoc(doc(db,"shifts",id),{["slots."+user.uid+".status"]:"started",["slots."+user.uid+".otpTry"]:v})}catch(err){$("e"+id).textContent="Wrong OTP. Ask the business again.";return}}
  else if(t.dataset.paid){const p=t.dataset.paid.split("|");await updateDoc(doc(db,"shifts",p[0]),{["slots."+p[1]+".paid"]:true})}
+ else if(t.dataset.recv){const sh=find(t.dataset.recv);if(!confirm("Confirm that you received "+inr(sh.rate*sh.hours)+"?"))return;await updateDoc(doc(db,"shifts",t.dataset.recv),{["slots."+user.uid+".received"]:true})}
  else if(t.dataset.qr){qrOpen[t.dataset.qr]=!qrOpen[t.dataset.qr]}
  else if(t.dataset.end){const p=t.dataset.end.split("|");await updateDoc(doc(db,"shifts",p[0]),{["slots."+p[1]+".status"]:"done"})}
  else return;
