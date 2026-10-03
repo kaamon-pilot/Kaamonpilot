@@ -36,13 +36,15 @@ import {getFirestore,collection,updateDoc,deleteDoc,doc,onSnapshot,query,orderBy
 const ADMIN="rizwankousar2011@gmail.com";
 const firebaseConfig={apiKey:"AIzaSyAhlOUnba7MfRQIFlif60qsUkkZHnQS6Rc",authDomain:"kaamon-pilot.firebaseapp.com",projectId:"kaamon-pilot",storageBucket:"kaamon-pilot.firebasestorage.app",messagingSenderId:"463694330185",appId:"1:463694330185:web:2a445f304195f4cd8f4298"};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
-let tab="users",flt="all",users=[],shifts=[],unsubs=[],err="";const $=id=>document.getElementById(id);
+let AV={},tab="users",flt="all",users=[],shifts=[],unsubs=[],err="";const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const inr=n=>"\u20b9"+Number(n).toLocaleString("en-IN");
-const NAMES={open:"OPEN",full:"FULL",done:"COMPLETED",cancelled:"CANCELLED"};
+const NAMES={open:"OPEN",full:"FULL",done:"COMPLETED",cancelled:"CANCELLED",expired:"EXPIRED"};
 const okMap=u=>/^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|www\.google\.com\/maps|google\.com\/maps|maps\.google\.com)(\/|\?|$)/.test(u||"");
+const fmtDate=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||"")?new Date(d+"T00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"}):(d||"");
+const fmtT=t=>/^\d{2}:\d{2}$/.test(t||"")?new Date("2000-01-01T"+t).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",hour12:true}).toUpperCase():(t||"");
 const slotsOf=s=>Object.entries(s.slots||{}).map(([uid,v])=>({uid,...v}));
-function stat(s){if(s.status=="cancelled")return "cancelled";if(!s.needed)return s.status||"open";const L=slotsOf(s);if(L.length&&L.filter(w=>w.status=="done").length>=s.needed)return "done";if(L.length>=s.needed)return "full";return "open"}
+function stat(s){if(s.status=="cancelled")return "cancelled";if(!s.needed)return s.status||"open";const L=slotsOf(s);if(L.length&&L.filter(w=>w.status=="done").length>=s.needed)return "done";if(L.length>=s.needed)return "full";if(s.startAt&&Date.now()>s.startAt+s.hours*3600000)return "expired";return "open"}
 
 function draw(){
  const u=auth.currentUser;
@@ -54,12 +56,12 @@ function draw(){
  if(err)h+='<p>'+esc(err)+'</p>';
  if(tab=="users"){
   const L=users.slice().sort((a,b)=>(a.status=="pending"?0:1)-(b.status=="pending"?0:1));
-  h+=L.length?L.map(x=>`<div class="card ${x.status}"><b>${esc(x.name)}</b><span class="tag">${esc(x.role)}</span><span class="tag">${esc(x.status)}</span><br>${esc(x.email)}<br><a href="tel:${esc(x.phone)}">${esc(x.phone)}</a> · <a href="https://wa.me/91${esc(x.phone)}" target="_blank" rel="noopener">WhatsApp</a>
+  h+=L.length?L.map(x=>`<div class="card ${x.status}"><b>${esc(x.name)}</b><span class="tag">${esc(x.role)}</span>${AV[x.id]?`<span class="tag">★ ${(AV[x.id].s/AV[x.id].n).toFixed(1)} (${AV[x.id].n})</span>`:""}<span class="tag">${esc(x.status)}</span><br>${esc(x.email)}<br><a href="tel:${esc(x.phone)}">${esc(x.phone)}</a> · <a href="https://wa.me/91${esc(x.phone)}" target="_blank" rel="noopener">WhatsApp</a>
   <div class="a">${x.status!="approved"?`<button class="g" data-ap="${x.id}">Approve</button>`:""}${x.status!="blocked"?`<button class="r" data-bl="${x.id}">Block</button>`:""}<button data-du="${x.id}">Delete</button></div></div>`).join(""):'<div class="empty">No users yet.</div>'}
  else{
-  h+='<div class="f">'+["all","open","full","done","cancelled"].map(k=>`<button data-f="${k}" class="${flt==k?"on":""}">${k}</button>`).join("")+'</div>';
+  h+='<div class="f">'+["all","open","full","done","cancelled","expired"].map(k=>`<button data-f="${k}" class="${flt==k?"on":""}">${k}</button>`).join("")+'</div>';
   const L=shifts.filter(s=>flt=="all"||stat(s)==flt);
-  h+=L.length?L.map(s=>`<div class="card ${stat(s)}"><b>${esc(s.venue)}</b><span class="tag">${esc(s.trade||"waiter")}</span><span class="tag">${NAMES[stat(s)]||esc(stat(s))}${s.needed?" "+slotsOf(s).length+"/"+s.needed:""}</span><br>${esc(s.date)}, ${esc(s.time)} \u00b7 ${s.hours} hrs \u00b7 ${inr(s.rate)}/hr = <b>${inr(s.rate*s.hours)}</b>${okMap(s.map)?`<br><a href="${esc(s.map)}" target="_blank" rel="noopener">Map</a>`:s.address?"<br>Address: "+esc(s.address):""}<br>Business: ${esc(s.ownerName||"-")}${slotsOf(s).length?"<br>Waiters: "+slotsOf(s).map(w=>esc(w.name)+" ("+esc(w.status)+", "+esc(w.pay||"cash")+(w.paid?", paid":"")+(w.received?", received":"")+")").join(", "):""}
+  h+=L.length?L.map(s=>`<div class="card ${stat(s)}"><b>${esc(s.venue)}</b><span class="tag">${esc(s.trade||"waiter")}</span><span class="tag">${NAMES[stat(s)]||esc(stat(s))}${s.needed?" "+slotsOf(s).length+"/"+s.needed:""}</span><br>${esc(fmtDate(s.date))}, ${esc(fmtT(s.time))} \u00b7 ${s.hours} hrs \u00b7 ${inr(s.rate)}/hr = <b>${inr(s.rate*s.hours)}</b>${okMap(s.map)?`<br><a href="${esc(s.map)}" target="_blank" rel="noopener">Map</a>`:s.address?"<br>Address: "+esc(s.address):""}<br>Business: ${esc(s.ownerName||"-")}${slotsOf(s).length?"<br>Waiters: "+slotsOf(s).map(w=>esc(w.name)+" ("+esc(w.status)+", "+esc(w.pay||"cash")+(w.paid?", paid":"")+(w.received?", received":"")+")").join(", "):""}
   <div class="a">${stat(s)!="cancelled"&&stat(s)!="done"?`<button class="r" data-c="${s.id}">Cancel</button>`:""}${(s.status=="cancelled"||slotsOf(s).length)&&stat(s)!="done"?`<button data-o="${s.id}">Reset</button>`:""}<button data-d="${s.id}">Delete</button></div></div>`).join(""):'<div class="empty">Nothing here.</div>'}
  $("main").innerHTML=h}
 
@@ -67,6 +69,7 @@ function stop(){unsubs.forEach(f=>f());unsubs=[];users=[];shifts=[]}
 onAuthStateChanged(auth,u=>{stop();err="";
  if(u&&(u.email||"").toLowerCase()===ADMIN){
   unsubs.push(onSnapshot(collection(db,"users"),s=>{users=s.docs.map(d=>({id:d.id,...d.data()}));draw()},e=>{err="Users: "+e.message;draw()}));
+  unsubs.push(onSnapshot(collection(db,"ratings"),s=>{AV={};s.docs.forEach(d=>{const r=d.data(),z=AV[r.to]||(AV[r.to]={s:0,n:0});z.s+=r.stars;z.n++});draw()},e=>{err="Ratings: "+e.message;draw()}));
   unsubs.push(onSnapshot(query(collection(db,"shifts"),orderBy("created","desc")),s=>{shifts=s.docs.map(d=>({id:d.id,...d.data()}));draw()},e=>{err="Shifts: "+e.message;draw()}))}
  draw()});
 

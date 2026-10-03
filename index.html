@@ -52,8 +52,20 @@ input:focus,select:focus{outline:none;border-color:var(--brick)}
 .pick button{flex:1;height:44px;border:1.5px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
 .pick button.on{background:var(--brick);border-color:var(--brick);color:var(--onb)}
 .otp{font:600 30px/1 var(--mono);letter-spacing:.3em;color:var(--brick);text-align:center;padding:14px 0 14px .3em;margin:8px 0;border:2px dashed var(--line);border-radius:12px}
+.avg{font-size:12px;font-weight:600;color:var(--mut)}
+.rate{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:13px;color:var(--mut)}
+.stars button{background:none;border:0;font-size:30px;line-height:1;color:var(--turm);padding:6px 3px;cursor:pointer}
+.rated{margin-top:8px;font-size:13px;color:var(--mut)}
 .empty{color:var(--mut);text-align:center;padding:20px 0;font-size:14px}
 .err{color:var(--brick);font-size:13px;margin-top:6px}
+.clockbox{margin:10px 0;padding:12px;border:2px dashed var(--line);border-radius:12px;text-align:center;color:var(--mut);font-size:13px}
+.clock{font:600 34px/1.1 var(--mono);color:var(--ok);letter-spacing:.04em;margin-top:2px}
+.clk{font:600 13px var(--mono);color:var(--ok)}
+.clock-row{font-size:13px;color:var(--mut);margin:2px 0 4px}
+.mut{color:var(--mut)}
+.t-expired{background:var(--line);color:var(--mut)}
+input[id^=rc_]{height:40px;margin-top:8px;font-size:14px}
+input[type=date],input[type=time]{-webkit-appearance:none;appearance:none;min-height:46px}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
@@ -73,12 +85,34 @@ const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const inr=n=>"₹"+Number(n).toLocaleString("en-IN");
-const NAMES={open:"OPEN",full:"FULL",done:"COMPLETED",cancelled:"CANCELLED"};
+const NAMES={open:"OPEN",full:"FULL",done:"COMPLETED",cancelled:"CANCELLED",expired:"EXPIRED"};
 const TRADE={waiter:"Waiter",helper:"General helper"};
 const W={accepted:"ACCEPTED",started:"IN PROGRESS",done:"COMPLETED"};
 const okMap=u=>/^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|www\.google\.com\/maps|google\.com\/maps|maps\.google\.com)(\/|\?|$)/.test(u||"");
+const fmtDate=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||"")?new Date(d+"T00:00").toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"}):(d||"");
+const fmtT=t=>/^\d{2}:\d{2}$/.test(t||"")?new Date("2000-01-01T"+t).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",hour12:true}).toUpperCase():(t||"");
+const fmtMs=ms=>new Date(ms).toLocaleTimeString("en-IN",{hour:"numeric",minute:"2-digit",hour12:true}).toUpperCase();
+const stamp=v=>{const ms=tsMs(v);return ms?new Date(ms).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+", "+fmtMs(ms):""};
+const tsMs=v=>v&&v.toMillis?v.toMillis():null;
+const pad=n=>String(n).padStart(2,"0");
+const fmtClock=ms=>{ms=Math.max(0,Math.floor(ms/1000));return pad(Math.floor(ms/3600))+":"+pad(Math.floor(ms%3600/60))+":"+pad(ms%60)};
+const fmtDur=ms=>{const m=Math.max(0,Math.round(ms/60000));return Math.floor(m/60)+"h "+pad(m%60)+"m"};
+const todayISO=()=>{const d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())};
+function whenText(s){let t=fmtDate(s.date)+", "+fmtT(s.time);if(s.startAt){const e=s.startAt+s.hours*3600000;t+=" to "+fmtMs(e)+(new Date(e).toDateString()!=new Date(s.startAt).toDateString()?" (next day)":"")}return t}
+function timeLine(w){const st=tsMs(w.startedAt),en=tsMs(w.endedAt);
+ if(w.status=="started"&&st)return `<div class="clock-row">Started ${fmtMs(st)}, working <span class="clk" data-clock="${st}">00:00:00</span></div>`;
+ if(w.status=="done"&&st&&en)return `<div class="clock-row">${fmtMs(st)} to ${fmtMs(en)}, worked ${fmtDur(en-st)}</div>`;
+ return ""}
+function tick(){document.querySelectorAll("[data-clock]").forEach(el=>{el.textContent=fmtClock(Date.now()-(+el.dataset.clock))})}
+setInterval(tick,1000);
 const slotsOf=s=>Object.entries(s.slots||{}).map(([uid,v])=>({uid,...v}));
 function upiLink(s,w){return "upi://pay?pa="+encodeURIComponent(w.upi||"")+"&pn="+encodeURIComponent(w.name)+"&am="+(s.rate*s.hours).toFixed(2)+"&cu=INR&tn="+encodeURIComponent("KaamOn shift")}
+function avgText(uid){const a=AV[uid];return a?`<span class="avg">★ ${(a.s/a.n).toFixed(1)} (${a.n})</span>`:`<span class="avg">New</span>`}
+function rateLine(s,to){const mine=ratings.find(x=>x.shift==s.id&&x.by==user.uid&&x.to==to),theirs=ratings.find(x=>x.shift==s.id&&x.to==user.uid&&x.by==to);
+ let h="";
+ if(theirs)h+=`<div class="rated">They rated you ${"★".repeat(theirs.stars)}${theirs.comment?`: "${esc(theirs.comment)}"`:""}</div>`;
+ if(mine)return h+`<div class="rated">You rated ${"★".repeat(mine.stars)}${mine.comment?`: "${esc(mine.comment)}"`:""}</div>`;
+ return h+`<input id="rc_${s.id}_${to}" maxlength="200" placeholder="Add a comment (optional)"><div class="rate"><span>Rate this ${prof.role=="business"?"worker":"business"}</span><div class="stars">${[1,2,3,4,5].map(n=>`<button data-rate="${s.id}|${to}|${n}" aria-label="${n} star${n>1?"s":""}">★</button>`).join("")}</div></div>`}
 function payBlock(s,w){
  const k=s.id+"|"+w.uid,amt=inr(s.rate*s.hours),upi=(w.pay=="upi"&&w.upi);
  let h=` <span class="tag">${upi?"UPI":"CASH"}</span>`;
@@ -89,12 +123,12 @@ function payBlock(s,w){
  return h+` <button class="btn sm" data-paid="${k}">Mark paid</button>`}
 function upiSaved(){try{return localStorage.getItem("kg_upi")||""}catch(e){return ""}}
 const find=id=>shifts.filter(x=>x.id==id)[0];
-function stat(s){if(s.status=="cancelled")return "cancelled";const L=slotsOf(s);if(L.length&&L.filter(w=>w.status=="done").length>=s.needed)return "done";if(L.length>=s.needed)return "full";return "open"}
+function stat(s){if(s.status=="cancelled")return "cancelled";const L=slotsOf(s);if(L.length&&L.filter(w=>w.status=="done").length>=s.needed)return "done";if(L.length>=s.needed)return "full";if(s.startAt&&Date.now()>s.startAt+s.hours*3600000)return "expired";return "open"}
 
-let user=null,prof=undefined,shifts=[],otps={},contacts={},qrOpen={},unProf=null,unShifts=null,pickRole="waiter",msg="";
+let user=null,prof=undefined,shifts=[],otps={},contacts={},qrOpen={},ratings=[],AV={},unRat=null,unProf=null,unShifts=null,pickRole="waiter",msg="";
 
 function extra(s){return (okMap(s.map)?`<div class="ex"><a href="${esc(s.map)}" target="_blank" rel="noopener">Open location in Google Maps</a></div>`:s.address?`<div class="ex">Address: ${esc(s.address)}</div>`:"")+(s.dress?`<div class="ex">Dress code: ${esc(s.dress)}</div>`:"")+(s.notes?`<div class="ex">Note: ${esc(s.notes)}</div>`:"")}
-function head(s){return `<div class="tk"><div><b class="venue">${esc(s.venue)}</b><div class="meta">${TRADE[s.trade||"waiter"]} needed ${esc(s.date)}, ${esc(s.time)} for ${s.hours} hrs at ${inr(s.rate)}/hr</div></div><div class="amt">${inr(s.rate*s.hours)}<small>per worker</small></div></div><span class="tag t-${stat(s)}">${NAMES[stat(s)]} ${slotsOf(s).length}/${s.needed}</span>${extra(s)}<hr class="perf">`}
+function head(s){return `<div class="tk"><div><b class="venue">${esc(s.venue)}</b><div class="meta">${TRADE[s.trade||"waiter"]} needed ${esc(whenText(s))} for ${s.hours} hrs at ${inr(s.rate)}/hr</div></div><div class="amt">${inr(s.rate*s.hours)}<small>per worker</small></div></div><span class="tag t-${stat(s)}">${NAMES[stat(s)]} ${slotsOf(s).length}/${s.needed}</span>${extra(s)}${s.created&&stamp(s.created)?`<div class="ex mut">Posted ${stamp(s.created)}</div>`:""}<hr class="perf">`}
 
 function viewLogin(){return `<div class="card"><b class="venue">Welcome to KaamOn</b><p>Sign in with Google to post or take shifts.</p><button class="btn" id="login">Sign in with Google</button><div class="err" id="m">${esc(msg)}</div></div>`}
 
@@ -109,7 +143,7 @@ function viewBlocked(){return `<div class="card"><b>Account not active</b><p>Ple
 
 function viewB(){
  let h=`<div class="tl">Insta help on one tap.</div><div class="card"><b class="venue">Post a shift</b><label>Venue</label><input id="v" placeholder="e.g. Third Wave Coffee, 5th Block">
- <div class="row"><div><label>Day</label><input id="d" placeholder="Sat"></div><div><label>Start</label><input id="t" placeholder="7:00 PM"></div></div>
+ <div class="row"><div><label>Date</label><input id="d" type="date" min="${todayISO()}"></div><div><label>Start time</label><input id="t" type="time"></div></div>
  <label>Worker needed</label><select id="tr"><option value="waiter">Waiter</option><option value="helper">General helper</option></select>
  <div class="row"><div><label>Hours</label><input id="h" type="number" value="5"></div><div><label>₹/hr</label><input id="r" type="number" value="200"></div><div><label>Workers</label><input id="nd" type="number" min="1" max="20" value="1"></div></div>
  <label>Location (Google Maps)</label><input id="ml" placeholder="Paste Google Maps link"><button class="btn sm alt" id="loc" style="margin-top:6px">Use my current location</button><div class="sub">Or in Google Maps: open the place, tap Share, copy the link.</div>
@@ -121,24 +155,25 @@ function viewB(){
  shifts.forEach(s=>{h+=`<div class="card ${stat(s)}">${head(s)}`;
   h+=`<br>Total for ${s.needed}: <b>${inr(s.rate*s.hours*s.needed)}</b>`;
   const L=slotsOf(s);
-  L.forEach(w=>{h+=`<br>${esc(w.name)} <span class="tag">${W[w.status]||""}</span>`+payBlock(s,w)+(w.status=="started"?` <button class="btn sm alt" data-end="${s.id}|${w.uid}">Confirm finished</button>`:"")});
+  L.forEach(w=>{h+=`<br>${esc(w.name)} ${avgText(w.uid)} <span class="tag">${W[w.status]||""}</span>`+timeLine(w)+payBlock(s,w)+(w.status=="done"?rateLine(s,w.uid):"")+(w.status=="started"?` <button class="btn sm alt" data-end="${s.id}|${w.uid}">Confirm finished</button>`:"")});
   if(L.some(w=>w.status=="accepted"))h+=`<div>Share this OTP with waiters on arrival:</div><div class="otp">${esc(otps[s.id]||"…")}</div>`;
   h+="</div>"});return h}
 
 function viewW(){
- const open=shifts.filter(s=>stat(s)=="open"&&(s.trade||"waiter")==prof.role&&!(s.slots||{})[user.uid]),mine=shifts.filter(s=>(s.slots||{})[user.uid]);
+ const open=shifts.filter(s=>stat(s)=="open"&&(s.trade||"waiter")==prof.role&&!(s.slots||{})[user.uid]).sort((a,b)=>(a.startAt||9e15)-(b.startAt||9e15)),mine=shifts.filter(s=>(s.slots||{})[user.uid]);
  let h="<h2>Open shifts nearby</h2>";
  if(!open.length)h+='<div class="empty">No open shifts right now.</div>';
- open.forEach(s=>h+=`<div class="card">${head(s)}<br>By ${esc(s.ownerName||"")} · ${s.needed-slotsOf(s).length} spot(s) left<label>How do you want to be paid?</label><select id="pm${s.id}"><option value="cash">Cash</option><option value="upi">Online payment (QR / UPI)</option></select><label>Your UPI ID (for online payment)</label><input id="up${s.id}" placeholder="name@bank" value="${esc(upiSaved())}"><button class="btn" data-acc="${s.id}">Accept shift</button></div>`);
+ open.forEach(s=>h+=`<div class="card">${head(s)}<br>By ${esc(s.ownerName||"")} ${avgText(s.owner)} · ${s.needed-slotsOf(s).length} spot(s) left<label>How do you want to be paid?</label><select id="pm${s.id}"><option value="cash">Cash</option><option value="upi">Online payment (QR / UPI)</option></select><label>Your UPI ID (for online payment)</label><input id="up${s.id}" placeholder="name@bank" value="${esc(upiSaved())}"><button class="btn" data-acc="${s.id}">Accept shift</button></div>`);
  h+="<h2>My shifts</h2>";
  if(!mine.length)h+='<div class="empty">Nothing accepted yet.</div>';
  mine.forEach(s=>{const my=s.slots[user.uid];h+=`<div class="card ${my.status=="done"?"done":""}">${head(s)}${contacts[s.id]?`<br>Contact: <a href="tel:${esc(contacts[s.id])}">${esc(contacts[s.id])}</a>`:""}`;
   h+=`<br>Payment: ${my.pay=="upi"?"Online (UPI) · "+esc(my.upi||""):"Cash"}${my.received?" · <b>Receipt confirmed</b>":my.paid?" · <b>Marked paid by business</b>":""}`;
   if(my.paid&&!my.received)h+=`<br><button class="btn" data-recv="${s.id}">Confirm payment received</button>`;
+  if(my.status=="done")h+=rateLine(s,s.owner);
   if(s.status=="cancelled")h+="<br><b>This shift was cancelled.</b>";
   else if(my.status=="accepted")h+=`<label>Enter OTP from the business</label><input id="o${s.id}" inputmode="numeric" maxlength="4"><button class="btn" data-go="${s.id}">Start shift</button><div class="err" id="e${s.id}"></div>`;
-  else if(my.status=="started")h+="<div>Shift running.</div>";
-  else if(my.status=="done")h+=`<div>Job ticket #${s.id.slice(0,5).toUpperCase()} · You earn <b>${inr(s.rate*s.hours)}</b></div>`;
+  else if(my.status=="started")h+=`<div class="clockbox"><small>Time worked</small><div class="clock" data-clock="${tsMs(my.startedAt)||Date.now()}">00:00:00</div></div>`;
+  else if(my.status=="done")h+=`<div>Job ticket #${s.id.slice(0,5).toUpperCase()} · You earn <b>${inr(s.rate*s.hours)}</b></div>`+timeLine(my);
   h+="</div>"});
  return h+`<div class="err">${esc(msg)}</div>`}
 
@@ -153,14 +188,15 @@ function draw(){
  else if(prof.status!="approved")h=viewBlocked();
  else h=prof.role=="business"?viewB():viewW();
  $("app").innerHTML=h;
- document.querySelectorAll("[data-upi]").forEach(el=>{el.innerHTML="";if(typeof QRCode!="undefined")new QRCode(el,{text:el.dataset.upi,width:180,height:180})})}
+ document.querySelectorAll("[data-upi]").forEach(el=>{el.innerHTML="";if(typeof QRCode!="undefined")new QRCode(el,{text:el.dataset.upi,width:180,height:180})});tick()}
 
-function stop(){if(unProf)unProf();if(unShifts)unShifts();unProf=unShifts=null;shifts=[];otps={};contacts={};qrOpen={}}
+function stop(){if(unProf)unProf();if(unShifts)unShifts();if(unRat)unRat();unProf=unShifts=unRat=null;shifts=[];ratings=[];AV={};otps={};contacts={};qrOpen={}}
 function subShifts(){
  if(unShifts)return;
+ unRat=onSnapshot(collection(db,"ratings"),sn=>{ratings=sn.docs.map(d=>d.data());AV={};ratings.forEach(r=>{const a=AV[r.to]||(AV[r.to]={s:0,n:0});a.s+=r.stars;a.n++});draw()},()=>{});
  const q=prof.role=="business"?query(collection(db,"shifts"),where("owner","==",user.uid)):query(collection(db,"shifts"),orderBy("created","desc"));
  unShifts=onSnapshot(q,snap=>{
-  shifts=snap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>s.needed);
+  shifts=snap.docs.map(d=>({id:d.id,...d.data({serverTimestamps:"estimate"})})).filter(s=>s.needed);
   if(prof.role=="business"){
    shifts.sort((a,b)=>(b.created?b.created.seconds:9e12)-(a.created?a.created.seconds:9e12));
    shifts.filter(s=>slotsOf(s).some(w=>w.status=="accepted")&&!otps[s.id]).forEach(async s=>{
@@ -194,12 +230,14 @@ document.addEventListener("click",async e=>{
   if(nm.length<2||!/^[6-9]\d{9}$/.test(ph)){msg="Enter a valid name and 10-digit mobile number.";$("m").textContent=msg;return}
   await setDoc(doc(db,"users",user.uid),{name:nm,phone:ph,role:pickRole,status:"pending",email:user.email||"",created:serverTimestamp()})}
  else if(t.id=="post"){const v=$("v").value.trim(),d=$("d").value.trim(),tm=$("t").value.trim(),hr=+$("h").value,rt=+$("r").value,nd=Math.floor(+$("nd").value),tr=$("tr").value,ml=$("ml").value.trim(),dc=$("dc").value.trim(),nt=$("nt").value.trim(),cp=$("cp").value.trim();
-  if(!v||!d||!tm||!(hr>0)||!(rt>0)){$("m").textContent="Please fill venue, day, start, hours and rate.";return}
+  if(!v||!d||!tm||!(hr>0)||!(rt>0)){$("m").textContent="Please fill venue, date, start time, hours and rate.";return}
+  const startAt=new Date(d+"T"+tm).getTime();
+  if(!(startAt>Date.now())){$("m").textContent="Choose a date and start time in the future.";return}
   if(!okMap(ml)){$("m").textContent="Add a Google Maps location: paste a Maps link or tap Use my current location.";return}
   if(!(nd>=1&&nd<=20)){$("m").textContent="Workers needed must be between 1 and 20.";return}
   if(!/^[6-9]\d{9}$/.test(cp)){$("m").textContent="Enter a valid 10-digit contact number.";return}
   const ref=doc(collection(db,"shifts")),b=writeBatch(db);
-  b.set(ref,{venue:v,date:d,time:tm,hours:hr,rate:rt,map:ml,dress:dc,notes:nt,trade:tr,needed:nd,slots:{},status:"open",owner:user.uid,ownerName:prof.name,created:serverTimestamp()});
+  b.set(ref,{venue:v,date:d,time:tm,startAt:startAt,hours:hr,rate:rt,map:ml,dress:dc,notes:nt,trade:tr,needed:nd,slots:{},status:"open",owner:user.uid,ownerName:prof.name,created:serverTimestamp()});
   b.set(doc(db,"shifts",ref.id,"secret","otp"),{code:String(1000+Math.floor(Math.random()*9000))});
   b.set(doc(db,"shifts",ref.id,"secret","contact"),{phone:cp});
   await b.commit()}
@@ -209,11 +247,14 @@ document.addEventListener("click",async e=>{
   const slot={name:prof.name,status:"accepted",pay:pm};if(pm=="upi")slot.upi=up;
   try{await updateDoc(doc(db,"shifts",id),{["slots."+user.uid]:slot})}catch(err){msg="Could not accept. The shift may just have been filled.";draw();return}}
  else if(t.dataset.go){const id=t.dataset.go,v=$("o"+id).value.trim();
-  try{await updateDoc(doc(db,"shifts",id),{["slots."+user.uid+".status"]:"started",["slots."+user.uid+".otpTry"]:v})}catch(err){$("e"+id).textContent="Wrong OTP. Ask the business again.";return}}
+  try{await updateDoc(doc(db,"shifts",id),{["slots."+user.uid+".status"]:"started",["slots."+user.uid+".otpTry"]:v,["slots."+user.uid+".startedAt"]:serverTimestamp()})}catch(err){$("e"+id).textContent="Wrong OTP. Ask the business again.";return}}
  else if(t.dataset.paid){const p=t.dataset.paid.split("|");await updateDoc(doc(db,"shifts",p[0]),{["slots."+p[1]+".paid"]:true})}
  else if(t.dataset.recv){const sh=find(t.dataset.recv);if(!confirm("Confirm that you received "+inr(sh.rate*sh.hours)+"?"))return;await updateDoc(doc(db,"shifts",t.dataset.recv),{["slots."+user.uid+".received"]:true})}
+ else if(t.dataset.rate){const p=t.dataset.rate.split("|");if(!confirm("Give "+p[2]+" star"+(p[2]=="1"?"":"s")+"? You cannot change it later."))return;
+  const cm=($("rc_"+p[0]+"_"+p[1])||{value:""}).value.trim().slice(0,200);
+  await setDoc(doc(db,"ratings",p[0]+"_"+user.uid+"_"+p[1]),{shift:p[0],by:user.uid,to:p[1],stars:+p[2],comment:cm,created:serverTimestamp()})}
  else if(t.dataset.qr){qrOpen[t.dataset.qr]=!qrOpen[t.dataset.qr]}
- else if(t.dataset.end){const p=t.dataset.end.split("|");await updateDoc(doc(db,"shifts",p[0]),{["slots."+p[1]+".status"]:"done"})}
+ else if(t.dataset.end){const p=t.dataset.end.split("|");await updateDoc(doc(db,"shifts",p[0]),{["slots."+p[1]+".status"]:"done",["slots."+p[1]+".endedAt"]:serverTimestamp()})}
  else return;
  }catch(err){msg="Could not save: "+err.message;const m=$("m");if(m)m.textContent=msg}
  document.activeElement.blur();draw()});
