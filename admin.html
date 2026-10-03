@@ -30,13 +30,15 @@ const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 let tab="users",flt="all",users=[],shifts=[],unsubs=[],err="";const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const inr=n=>"\u20b9"+Number(n).toLocaleString("en-IN");
-const NAMES={open:"OPEN",accepted:"ACCEPTED",started:"IN PROGRESS",done:"COMPLETED",cancelled:"CANCELLED"};
+const NAMES={open:"OPEN",full:"FULL",done:"COMPLETED",cancelled:"CANCELLED"};
+const slotsOf=s=>Object.entries(s.slots||{}).map(([uid,v])=>({uid,...v}));
+function stat(s){if(s.status=="cancelled")return "cancelled";if(!s.needed)return s.status||"open";const L=slotsOf(s);if(L.length&&L.filter(w=>w.status=="done").length>=s.needed)return "done";if(L.length>=s.needed)return "full";return "open"}
 
 function draw(){
  const u=auth.currentUser;
  if(!u){$("main").innerHTML='<button class="big" id="login">Sign in with Google</button>'+(err?'<p>'+esc(err)+'</p>':"");return}
  if((u.email||"").toLowerCase()!==ADMIN){$("main").innerHTML='<div class="empty">This account is not allowed here.</div><button class="big" id="out">Sign out</button>';return}
- const pend=users.filter(x=>x.status=="pending").length,openS=shifts.filter(s=>s.status=="open").length,act=shifts.filter(s=>s.status=="accepted"||s.status=="started").length,done=shifts.filter(s=>s.status=="done"),paid=done.reduce((t,s)=>t+s.rate*s.hours,0);
+ const pend=users.filter(x=>x.status=="pending").length,openS=shifts.filter(s=>stat(s)=="open").length,act=shifts.filter(s=>stat(s)=="full").length,done=shifts.filter(s=>stat(s)=="done"),paid=shifts.reduce((t,s)=>t+s.rate*s.hours*slotsOf(s).filter(w=>w.status=="done").length,0);
  let h='<div class="stats">'+[["Pending users",pend],["Open shifts",openS],["Active",act],["Completed",done.length],["Users",users.length],["Worker pay",inr(paid)]].map(x=>`<div class="st"><b>${x[1]}</b><small>${x[0]}</small></div>`).join("")+'</div>';
  h+='<div class="f"><button data-t="users" class="'+(tab=="users"?"on":"")+'">Users</button><button data-t="shifts" class="'+(tab=="shifts"?"on":"")+'">Shifts</button><button id="out">Sign out</button></div>';
  if(err)h+='<p>'+esc(err)+'</p>';
@@ -45,10 +47,10 @@ function draw(){
   h+=L.length?L.map(x=>`<div class="card ${x.status}"><b>${esc(x.name)}</b><span class="tag">${esc(x.role)}</span><span class="tag">${esc(x.status)}</span><br>${esc(x.email)}<br><a href="tel:${esc(x.phone)}">${esc(x.phone)}</a> · <a href="https://wa.me/91${esc(x.phone)}" target="_blank" rel="noopener">WhatsApp</a>
   <div class="a">${x.status!="approved"?`<button class="g" data-ap="${x.id}">Approve</button>`:""}${x.status!="blocked"?`<button class="r" data-bl="${x.id}">Block</button>`:""}<button data-du="${x.id}">Delete</button></div></div>`).join(""):'<div class="empty">No users yet.</div>'}
  else{
-  h+='<div class="f">'+["all","open","accepted","started","done","cancelled"].map(k=>`<button data-f="${k}" class="${flt==k?"on":""}">${k}</button>`).join("")+'</div>';
-  const L=shifts.filter(s=>flt=="all"||s.status==flt);
-  h+=L.length?L.map(s=>`<div class="card ${s.status}"><b>${esc(s.venue)}</b><span class="tag">${NAMES[s.status]||esc(s.status)}</span><br>${esc(s.date)}, ${esc(s.time)} \u00b7 ${s.hours} hrs \u00b7 ${inr(s.rate)}/hr = <b>${inr(s.rate*s.hours)}</b><br>Business: ${esc(s.ownerName||"-")}${s.worker?" \u00b7 Waiter: "+esc(s.worker):""}
-  <div class="a">${s.status!="cancelled"&&s.status!="done"?`<button class="r" data-c="${s.id}">Cancel</button>`:""}${s.status!="open"&&s.status!="done"?`<button data-o="${s.id}">Reopen</button>`:""}<button data-d="${s.id}">Delete</button></div></div>`).join(""):'<div class="empty">Nothing here.</div>'}
+  h+='<div class="f">'+["all","open","full","done","cancelled"].map(k=>`<button data-f="${k}" class="${flt==k?"on":""}">${k}</button>`).join("")+'</div>';
+  const L=shifts.filter(s=>flt=="all"||stat(s)==flt);
+  h+=L.length?L.map(s=>`<div class="card ${stat(s)}"><b>${esc(s.venue)}</b><span class="tag">${esc(s.trade||"waiter")}</span><span class="tag">${NAMES[stat(s)]||esc(stat(s))}${s.needed?" "+slotsOf(s).length+"/"+s.needed:""}</span><br>${esc(s.date)}, ${esc(s.time)} \u00b7 ${s.hours} hrs \u00b7 ${inr(s.rate)}/hr = <b>${inr(s.rate*s.hours)}</b>${s.address?"<br>Address: "+esc(s.address):""}<br>Business: ${esc(s.ownerName||"-")}${slotsOf(s).length?"<br>Waiters: "+slotsOf(s).map(w=>esc(w.name)+" ("+esc(w.status)+")").join(", "):""}
+  <div class="a">${stat(s)!="cancelled"&&stat(s)!="done"?`<button class="r" data-c="${s.id}">Cancel</button>`:""}${(s.status=="cancelled"||slotsOf(s).length)&&stat(s)!="done"?`<button data-o="${s.id}">Reset</button>`:""}<button data-d="${s.id}">Delete</button></div></div>`).join(""):'<div class="empty">Nothing here.</div>'}
  $("main").innerHTML=h}
 
 function stop(){unsubs.forEach(f=>f());unsubs=[];users=[];shifts=[]}
@@ -68,7 +70,7 @@ document.addEventListener("click",async e=>{const t=e.target;if(t.tagName!=="BUT
  else if(t.dataset.bl){if(confirm("Block this user?"))await updateDoc(doc(db,"users",t.dataset.bl),{status:"blocked"})}
  else if(t.dataset.du){if(confirm("Delete this user profile?"))await deleteDoc(doc(db,"users",t.dataset.du))}
  else if(t.dataset.c){if(confirm("Cancel this shift?"))await updateDoc(doc(db,"shifts",t.dataset.c),{status:"cancelled"})}
- else if(t.dataset.o){if(confirm("Reopen as an open shift? The waiter will be removed."))await updateDoc(doc(db,"shifts",t.dataset.o),{status:"open",worker:"",workerUid:"",otpTry:deleteField()})}
+ else if(t.dataset.o){if(confirm("Reset to an open shift? All waiters will be removed."))await updateDoc(doc(db,"shifts",t.dataset.o),{status:"open",slots:{}})}
  else if(t.dataset.d){if(confirm("Delete permanently?")){try{await deleteDoc(doc(db,"shifts",t.dataset.d,"secret","otp"))}catch(x){}await deleteDoc(doc(db,"shifts",t.dataset.d))}}
  }catch(x){err="Failed: "+x.message;draw()}});
 </script></body></html>

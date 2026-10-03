@@ -15,7 +15,7 @@
 .card{background:var(--card);border:1px dashed var(--line);border-left:5px solid var(--turm);padding:12px;margin:10px 0}
 .card.done{border-left-color:var(--ok)}.card.cancelled{opacity:.6}
 label{display:block;font-size:12px;color:var(--mut);margin-top:8px}
-input{width:100%;padding:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+input,select{width:100%;padding:9px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
 .row{display:flex;gap:8px}.row>*{flex:1}
 .btn{padding:10px;border:0;background:var(--brick);color:#fff;font:inherit;font-weight:600;margin-top:10px;width:100%}
 .btn.alt{background:var(--ink);color:var(--bg)}.btn.sm{width:auto;padding:6px 10px;margin:0;font-size:12px}
@@ -29,7 +29,7 @@ input{width:100%;padding:9px;border:1px solid var(--line);background:var(--bg);c
 <body>
 <div class="w">
 <div class="top"><h1>Kaamgar<span>.</span> Pilot</h1><span id="who"></span></div>
-<div class="sub">Waiter shifts · Koramangala, Bengaluru</div>
+<div class="sub">Waiters &amp; helpers · Koramangala, Bengaluru</div>
 <div id="app"><div class="empty">Loading…</div></div>
 </div>
 <script type="module">
@@ -42,16 +42,21 @@ const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const inr=n=>"₹"+Number(n).toLocaleString("en-IN");
-const NAMES={open:"OPEN",accepted:"ACCEPTED",started:"IN PROGRESS",done:"COMPLETED",cancelled:"CANCELLED"};
+const NAMES={open:"OPEN",full:"FULL",done:"COMPLETED",cancelled:"CANCELLED"};
+const TRADE={waiter:"Waiter",helper:"General helper"};
+const W={accepted:"ACCEPTED",started:"IN PROGRESS",done:"COMPLETED"};
+const slotsOf=s=>Object.entries(s.slots||{}).map(([uid,v])=>({uid,...v}));
+function stat(s){if(s.status=="cancelled")return "cancelled";const L=slotsOf(s);if(L.length&&L.filter(w=>w.status=="done").length>=s.needed)return "done";if(L.length>=s.needed)return "full";return "open"}
 
-let user=null,prof=undefined,shifts=[],otps={},unProf=null,unShifts=null,pickRole="waiter",msg="";
+let user=null,prof=undefined,shifts=[],otps={},contacts={},unProf=null,unShifts=null,pickRole="waiter",msg="";
 
-function head(s){return `<b>${esc(s.venue)}</b><span class="tag">${NAMES[s.status]||s.status}</span><br>${esc(s.date)}, ${esc(s.time)} · ${s.hours} hrs · ${inr(s.rate)}/hr<br><span class="big">${inr(s.rate*s.hours)}</span>`}
+function extra(s){return (s.address?`<br>Address: ${esc(s.address)}`:"")+(s.dress?`<br>Dress code: ${esc(s.dress)}`:"")+(s.notes?`<br>Note: ${esc(s.notes)}`:"")}
+function head(s){return `<b>${esc(s.venue)}</b><span class="tag">${NAMES[stat(s)]} ${slotsOf(s).length}/${s.needed}</span><br>${TRADE[s.trade||"waiter"]} · ${esc(s.date)}, ${esc(s.time)} · ${s.hours} hrs · ${inr(s.rate)}/hr${extra(s)}<br><span class="big">${inr(s.rate*s.hours)}</span> per waiter`}
 
 function viewLogin(){return `<div class="card"><b>Welcome</b><p>Sign in with your Google account to continue.</p><button class="btn" id="login">Sign in with Google</button><div class="err" id="m">${esc(msg)}</div></div>`}
 
 function viewRegister(){return `<div class="card"><b>Create your profile</b>
-<label>I am a</label><div class="pick"><button data-pick="business" class="${pickRole=="business"?"on":""}">Business</button><button data-pick="waiter" class="${pickRole=="waiter"?"on":""}">Waiter</button></div>
+<label>I am a</label><div class="pick"><button data-pick="business" class="${pickRole=="business"?"on":""}">Business</button><button data-pick="waiter" class="${pickRole=="waiter"?"on":""}">Waiter</button><button data-pick="helper" class="${pickRole=="helper"?"on":""}">General helper</button></div>
 <label>${pickRole=="business"?"Business / venue name":"Your full name"}</label><input id="nm" value="">
 <label>Mobile number (10 digits)</label><input id="ph" inputmode="numeric" maxlength="10">
 <button class="btn" id="reg">Submit for approval</button><div class="err" id="m">${esc(msg)}</div></div>`}
@@ -62,26 +67,33 @@ function viewBlocked(){return `<div class="card"><b>Account not active</b><p>Ple
 function viewB(){
  let h=`<div class="card"><b>Post a shift</b><label>Venue</label><input id="v" placeholder="e.g. Third Wave Coffee, 5th Block">
  <div class="row"><div><label>Day</label><input id="d" placeholder="Sat"></div><div><label>Start</label><input id="t" placeholder="7:00 PM"></div></div>
- <div class="row"><div><label>Hours</label><input id="h" type="number" value="5"></div><div><label>₹/hr</label><input id="r" type="number" value="200"></div></div>
+ <label>Worker needed</label><select id="tr"><option value="waiter">Waiter</option><option value="helper">General helper</option></select>
+ <div class="row"><div><label>Hours</label><input id="h" type="number" value="5"></div><div><label>₹/hr</label><input id="r" type="number" value="200"></div><div><label>Workers</label><input id="nd" type="number" min="1" max="20" value="1"></div></div>
+ <label>Address / location</label><input id="ad" placeholder="Street, area, landmark">
+ <label>Dress code</label><input id="dc" placeholder="e.g. black shirt, black pants">
+ <label>Notes for waiter</label><input id="nt" placeholder="e.g. Report to manager Suresh">
+ <label>Contact number for this shift</label><input id="cp" inputmode="numeric" maxlength="10" value="${esc(prof.phone)}">
  <button class="btn" id="post">Post shift</button><div class="err" id="m">${esc(msg)}</div></div><b>Your shifts</b>`;
  if(!shifts.length)h+='<div class="empty">No shifts yet.</div>';
- shifts.forEach(s=>{h+=`<div class="card ${s.status}">${head(s)}`;
-  if(s.worker)h+=`<br>Waiter: <b>${esc(s.worker)}</b>`;
-  if(s.status=="accepted")h+=`<div>Share this OTP with the waiter on arrival:</div><div class="otp">${esc(otps[s.id]||"…")}</div>`;
-  if(s.status=="started")h+=`<button class="btn alt" data-end="${s.id}">Confirm shift finished</button>`;
+ shifts.forEach(s=>{h+=`<div class="card ${stat(s)}">${head(s)}`;
+  h+=`<br>Total for ${s.needed}: <b>${inr(s.rate*s.hours*s.needed)}</b>`;
+  const L=slotsOf(s);
+  L.forEach(w=>{h+=`<br>${esc(w.name)} <span class="tag">${W[w.status]||""}</span>`+(w.status=="started"?` <button class="btn sm alt" data-end="${s.id}|${w.uid}">Confirm finished</button>`:"")});
+  if(L.some(w=>w.status=="accepted"))h+=`<div>Share this OTP with waiters on arrival:</div><div class="otp">${esc(otps[s.id]||"…")}</div>`;
   h+="</div>"});return h}
 
 function viewW(){
- const open=shifts.filter(s=>s.status=="open"),mine=shifts.filter(s=>s.workerUid==user.uid);
+ const open=shifts.filter(s=>stat(s)=="open"&&(s.trade||"waiter")==prof.role&&!(s.slots||{})[user.uid]),mine=shifts.filter(s=>(s.slots||{})[user.uid]);
  let h="<p><b>Open shifts nearby</b></p>";
  if(!open.length)h+='<div class="empty">No open shifts right now.</div>';
- open.forEach(s=>h+=`<div class="card">${head(s)}<br>By ${esc(s.ownerName||"")}<button class="btn" data-acc="${s.id}">Accept shift</button></div>`);
+ open.forEach(s=>h+=`<div class="card">${head(s)}<br>By ${esc(s.ownerName||"")} · ${s.needed-slotsOf(s).length} spot(s) left<button class="btn" data-acc="${s.id}">Accept shift</button></div>`);
  h+="<p><b>My shifts</b></p>";
  if(!mine.length)h+='<div class="empty">Nothing accepted yet.</div>';
- mine.forEach(s=>{h+=`<div class="card ${s.status}">${head(s)}`;
-  if(s.status=="accepted")h+=`<label>Enter OTP from the business</label><input id="o${s.id}" inputmode="numeric" maxlength="4"><button class="btn" data-go="${s.id}">Start shift</button><div class="err" id="e${s.id}"></div>`;
-  if(s.status=="started")h+="<div>Shift running.</div>";
-  if(s.status=="done")h+=`<div>Job ticket #${s.id.slice(0,5).toUpperCase()} · You earn <b>${inr(s.rate*s.hours)}</b></div>`;
+ mine.forEach(s=>{const my=s.slots[user.uid];h+=`<div class="card ${my.status=="done"?"done":""}">${head(s)}${contacts[s.id]?`<br>Contact: <a href="tel:${esc(contacts[s.id])}">${esc(contacts[s.id])}</a>`:""}`;
+  if(s.status=="cancelled")h+="<br><b>This shift was cancelled.</b>";
+  else if(my.status=="accepted")h+=`<label>Enter OTP from the business</label><input id="o${s.id}" inputmode="numeric" maxlength="4"><button class="btn" data-go="${s.id}">Start shift</button><div class="err" id="e${s.id}"></div>`;
+  else if(my.status=="started")h+="<div>Shift running.</div>";
+  else if(my.status=="done")h+=`<div>Job ticket #${s.id.slice(0,5).toUpperCase()} · You earn <b>${inr(s.rate*s.hours)}</b></div>`;
   h+="</div>"});
  return h+`<div class="err">${esc(msg)}</div>`}
 
@@ -97,16 +109,19 @@ function draw(){
  else h=prof.role=="business"?viewB():viewW();
  $("app").innerHTML=h}
 
-function stop(){if(unProf)unProf();if(unShifts)unShifts();unProf=unShifts=null;shifts=[];otps={}}
+function stop(){if(unProf)unProf();if(unShifts)unShifts();unProf=unShifts=null;shifts=[];otps={};contacts={}}
 function subShifts(){
  if(unShifts)return;
  const q=prof.role=="business"?query(collection(db,"shifts"),where("owner","==",user.uid)):query(collection(db,"shifts"),orderBy("created","desc"));
  unShifts=onSnapshot(q,snap=>{
-  shifts=snap.docs.map(d=>({id:d.id,...d.data()}));
+  shifts=snap.docs.map(d=>({id:d.id,...d.data()})).filter(s=>s.needed);
   if(prof.role=="business"){
    shifts.sort((a,b)=>(b.created?b.created.seconds:9e12)-(a.created?a.created.seconds:9e12));
-   shifts.filter(s=>s.status=="accepted"&&!otps[s.id]).forEach(async s=>{
+   shifts.filter(s=>slotsOf(s).some(w=>w.status=="accepted")&&!otps[s.id]).forEach(async s=>{
     try{const o=await getDoc(doc(db,"shifts",s.id,"secret","otp"));if(o.exists()){otps[s.id]=o.data().code;draw()}}catch(e){}})}
+  if(prof.role!="business"){
+   shifts.filter(s=>s.slots&&s.slots[user.uid]&&(s.slots[user.uid].status=="accepted"||s.slots[user.uid].status=="started")&&!contacts[s.id]).forEach(async s=>{
+    try{const o=await getDoc(doc(db,"shifts",s.id,"secret","contact"));if(o.exists()){contacts[s.id]=o.data().phone;draw()}}catch(e){}})}
   draw()},err=>{msg="Could not load shifts: "+err.message;draw()})}
 
 onAuthStateChanged(auth,u=>{
@@ -126,16 +141,19 @@ document.addEventListener("click",async e=>{
  else if(t.id=="reg"){const nm=$("nm").value.trim(),ph=$("ph").value.trim();
   if(nm.length<2||!/^[6-9]\d{9}$/.test(ph)){msg="Enter a valid name and 10-digit mobile number.";$("m").textContent=msg;return}
   await setDoc(doc(db,"users",user.uid),{name:nm,phone:ph,role:pickRole,status:"pending",email:user.email||"",created:serverTimestamp()})}
- else if(t.id=="post"){const v=$("v").value.trim(),d=$("d").value.trim(),tm=$("t").value.trim(),hr=+$("h").value,rt=+$("r").value;
-  if(!v||!d||!tm||!(hr>0)||!(rt>0)){$("m").textContent="Please fill all fields.";return}
+ else if(t.id=="post"){const v=$("v").value.trim(),d=$("d").value.trim(),tm=$("t").value.trim(),hr=+$("h").value,rt=+$("r").value,nd=Math.floor(+$("nd").value),tr=$("tr").value,ad=$("ad").value.trim(),dc=$("dc").value.trim(),nt=$("nt").value.trim(),cp=$("cp").value.trim();
+  if(!v||!d||!tm||!ad||!(hr>0)||!(rt>0)){$("m").textContent="Please fill venue, day, start, hours, rate and address.";return}
+  if(!(nd>=1&&nd<=20)){$("m").textContent="Workers needed must be between 1 and 20.";return}
+  if(!/^[6-9]\d{9}$/.test(cp)){$("m").textContent="Enter a valid 10-digit contact number.";return}
   const ref=doc(collection(db,"shifts")),b=writeBatch(db);
-  b.set(ref,{venue:v,date:d,time:tm,hours:hr,rate:rt,status:"open",worker:"",workerUid:"",owner:user.uid,ownerName:prof.name,created:serverTimestamp()});
+  b.set(ref,{venue:v,date:d,time:tm,hours:hr,rate:rt,address:ad,dress:dc,notes:nt,trade:tr,needed:nd,slots:{},status:"open",owner:user.uid,ownerName:prof.name,created:serverTimestamp()});
   b.set(doc(db,"shifts",ref.id,"secret","otp"),{code:String(1000+Math.floor(Math.random()*9000))});
+  b.set(doc(db,"shifts",ref.id,"secret","contact"),{phone:cp});
   await b.commit()}
- else if(t.dataset.acc){await updateDoc(doc(db,"shifts",t.dataset.acc),{status:"accepted",worker:prof.name,workerUid:user.uid})}
+ else if(t.dataset.acc){try{await updateDoc(doc(db,"shifts",t.dataset.acc),{["slots."+user.uid]:{name:prof.name,status:"accepted"}})}catch(err){msg="Could not accept. The shift may just have been filled.";draw();return}}
  else if(t.dataset.go){const id=t.dataset.go,v=$("o"+id).value.trim();
-  try{await updateDoc(doc(db,"shifts",id),{status:"started",otpTry:v})}catch(err){$("e"+id).textContent="Wrong OTP. Ask the business again.";return}}
- else if(t.dataset.end){await updateDoc(doc(db,"shifts",t.dataset.end),{status:"done"})}
+  try{await updateDoc(doc(db,"shifts",id),{["slots."+user.uid+".status"]:"started",["slots."+user.uid+".otpTry"]:v})}catch(err){$("e"+id).textContent="Wrong OTP. Ask the business again.";return}}
+ else if(t.dataset.end){const p=t.dataset.end.split("|");await updateDoc(doc(db,"shifts",p[0]),{["slots."+p[1]+".status"]:"done"})}
  else return;
  }catch(err){msg="Could not save: "+err.message;const m=$("m");if(m)m.textContent=msg}
  document.activeElement.blur();draw()});
