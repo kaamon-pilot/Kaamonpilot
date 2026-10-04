@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KaamOn Pilot</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#B8432A">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="KaamOn">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#F1EEE8;--card:#FFFFFF;--ink:#231F1C;--mut:#6B645D;--brick:#B8432A;--brick2:#962F1A;--onb:#FFFFFF;--turm:#E9A820;--line:#E2DDD3;--ok:#2F7A4B;--sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"IBM Plex Mono",ui-monospace,Menlo,monospace}
@@ -56,6 +64,8 @@ input:focus,select:focus{outline:none;border-color:var(--brick)}
 .rate{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:13px;color:var(--mut)}
 .stars button{background:none;border:0;font-size:30px;line-height:1;color:var(--turm);padding:6px 3px;cursor:pointer}
 .rated{margin-top:8px;font-size:13px;color:var(--mut)}
+.inst{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 8px 8px 14px;margin:4px 0 10px;font-size:13px}
+.inst .btn{margin:0;flex:none}
 .empty{color:var(--mut);text-align:center;padding:20px 0;font-size:14px}
 .err{color:var(--brick);font-size:13px;margin-top:6px}
 .clockbox{margin:10px 0;padding:12px;border:2px dashed var(--line);border-radius:12px;text-align:center;color:var(--mut);font-size:13px}
@@ -77,6 +87,7 @@ input:disabled,select:disabled{opacity:.45}
 <div class="w">
 <div class="top"><h1>KaamOn<span>.</span><small>Pilot</small></h1><span id="who"></span></div>
 <div class="sub">Waiters and helpers in Koramangala, Bengaluru</div>
+<div id="inst"></div>
 <div id="app"><div class="empty">Loading…</div></div>
 </div>
 <script type="module">
@@ -227,6 +238,7 @@ document.addEventListener("click",async e=>{
   m.textContent="Getting location...";
   navigator.geolocation.getCurrentPosition(p=>{$("ml").value="https://www.google.com/maps?q="+p.coords.latitude.toFixed(6)+","+p.coords.longitude.toFixed(6);m.textContent="Location added."},()=>{m.textContent="Could not get location. Allow location access, or paste a Maps link."},{enableHighAccuracy:true,timeout:15000});
   return}
+ if(t.id=="instbtn"){if(deferred){deferred.prompt();try{await deferred.userChoice}catch(x){}deferred=null;showInstall()}return}
  msg="";
  try{
  if(t.id=="login"){const p=new GoogleAuthProvider();
@@ -265,6 +277,17 @@ document.addEventListener("click",async e=>{
  else return;
  }catch(err){msg="Could not save: "+err.message;const m=$("m");if(m)m.textContent=msg}
  document.activeElement.blur();draw()});
+let deferred=null;
+const standalone=()=>window.matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+function showInstall(){const el=$("inst");if(!el)return;
+ if(standalone()){el.innerHTML="";return}
+ if(deferred)el.innerHTML='<div class="inst"><span>Install KaamOn on your phone</span><button class="btn sm" id="instbtn">Install</button></div>';
+ else if(/iphone|ipad|ipod/i.test(navigator.userAgent))el.innerHTML='<div class="inst"><span>To install: tap Share, then Add to Home Screen</span></div>';
+ else el.innerHTML=""}
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;showInstall()});
+window.addEventListener("appinstalled",()=>{deferred=null;showInstall()});
+showInstall();
+if("serviceWorker" in navigator)window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})});
 document.addEventListener("change",e=>{if(e.target.id=="now"){["d","th","tmn","tap"].forEach(i=>{const el=$(i);if(el){el.disabled=e.target.checked;if(e.target.checked&&i=="d")el.value=""}})}});
 </script>
 </body>
